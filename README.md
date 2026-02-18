@@ -1,8 +1,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/YourUsername/My-University">
-    <!-- 建议替换 logo 图片链接 -->
-    <img src="docs/logo.png" alt="My University Logo" width="120" height="120">
+    <img src="docs/Generated_Image_February_18,_2026_-_4_18PM.png" alt="My University Logo" width="120" height="120">
   </a>
 
   <h3 align="center">My University | 模拟大学</h3>
@@ -50,7 +49,6 @@
 ## 📸 游戏截图 (Screenshots)
 
 <div align="center">
-  <!-- 建议放一张 PC 端截图 和 一张 手机端竖屏/横屏 截图 -->
   <img src="docs/pc_screenshot.png" alt="PC Gameplay" width="45%">
   <img src="docs/mobile_screenshot.png" alt="Mobile Gameplay" width="25%">
 </div>
