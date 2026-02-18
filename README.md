@@ -1,7 +1,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/YourUsername/My-University">
-    <img src="docs/Generated_Image_February_18,_2026_-_4_18PM.png" alt="My University Logo" width="120" height="120">
+    <img src="Generated_Image_February_18,_2026_-_4_18PM.png" alt="My University Logo" width="120" height="120">
   </a>
 
   <h3 align="center">My University | 模拟大学</h3>
