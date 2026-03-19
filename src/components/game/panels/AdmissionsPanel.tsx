@@ -38,7 +38,7 @@ export const AdmissionsPanel: React.FC<AdmissionsPanelProps> = ({ gameState, set
         setCollegeAllocations(prev => ({ ...prev, [type]: newVal }));
     };
 
-    const totalAllocation = Object.values(collegeAllocations).reduce((a, b) => a + b, 0);
+    const totalAllocation = Object.values(collegeAllocations).reduce((a: number, b: number) => a + b, 0);
 
     const savePolicy = () => {
         if (totalAllocation !== 100) {
