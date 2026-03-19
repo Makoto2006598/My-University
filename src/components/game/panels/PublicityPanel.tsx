@@ -65,7 +65,7 @@ const BUFF_INFO: Record<PublicityBuffType, { name: string, desc: string, color: 
 
 export const PublicityPanel: React.FC<PublicityPanelProps> = ({ gameState, onStartSocial, onStartMinistry }) => {
     const isOverPublicity = gameState.publicity.activeBuffs.some(b => b.type === PublicityBuffType.OVER_PUBLICITY);
-    const activeSocial = gameState.publicity.activeCampaigns[0]; // Assuming one at a time for simplicity/UI
+    const activeSocial = gameState.publicity.activeCampaigns.length > 0 ? gameState.publicity.activeCampaigns[0] : null;
 
     return (
         <div className="flex flex-col h-full bg-orange-50/50 overflow-hidden">

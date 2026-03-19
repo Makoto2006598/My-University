@@ -317,7 +317,7 @@ export const CampusPlanner: React.FC = () => {
     <div className="h-full flex flex-col relative overflow-hidden bg-orange-50" style={{ filter: `brightness(${appSettings.brightness})` }}>
         <TopBar 
             gameState={gameState} currentStats={currentStats} gameDate={gameDate} gameSpeed={gameSpeed} appSettings={appSettings}
-            onRenameUniversity={() => { const n = prompt("新校名:", gameState.universityName); if(n) setGameState(p=>({...p, universityName:n, money:p.money-500000})); }}
+            onRenameUniversity={() => { const n = prompt("新校名:", gameState.universityName); if(n) { if(gameState.money < 500000) { alert("资金不足（需要500K）"); return; } setGameState(p=>({...p, universityName:n, money:p.money-500000})); } }}
             onSpeedChange={handlers.handleSpeedChange} onOpenSave={() => setShowSaveLoadModal(true)} onOpenSettings={() => setShowSettingsModal(true)}
         />
         
