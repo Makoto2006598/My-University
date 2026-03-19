@@ -346,7 +346,15 @@ export const CampusPlanner: React.FC = () => {
         <GameHUD 
             activeSidebarTab={activeSidebarTab} setActiveSidebarTab={setActiveSidebarTab} isMenuExpanded={isMenuExpanded} setIsMenuExpanded={setIsMenuExpanded}
             selectedTool={selectedTool} setSelectedTool={setSelectedTool} selectedVariantIndex={selectedVariantIndex} setSelectedVariantIndex={setSelectedVariantIndex}
-            is2DMode={is2DMode} onToggle2D={() => setIs2DMode(!is2DMode)}
+            is2DMode={is2DMode} onToggle2D={() => {
+                const newIs2D = !is2DMode;
+                setIs2DMode(newIs2D);
+                if (newIs2D) {
+                    setViewState(prev => ({ ...prev, pitch: 0, yaw: 0 }));
+                } else {
+                    setViewState(prev => ({ ...prev, pitch: 55 }));
+                }
+            }}
         />
 
         {activeSidebarTab && activeSidebarTab !== 'BUILD' && (
