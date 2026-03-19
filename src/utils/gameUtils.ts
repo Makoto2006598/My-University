@@ -108,12 +108,22 @@ export const calculateDailyIncome = (state: GameState): number => {
     let base = 0;
     if (state.uniType1 === UniType1.PUBLIC) {
         switch (state.rank) {
-            case UniversityRank.STARTUP: base = 300000 * (Math.max(1, J) / 30); break; 
-            case UniversityRank.TIER_3: base = 1000000 * (Math.max(1, J) / 150); break; 
-            case UniversityRank.TIER_2: base = 2000000 * (Math.max(1, J) / 200); break; 
-            case UniversityRank.TIER_1: base = 4000000 * (Math.max(1, J) / 500); break; 
-            case UniversityRank.PROJECT_211: base = 8000000 * (Math.max(1, J) / 1000); break; 
-            case UniversityRank.PROJECT_985: base = 10000000 * (Math.max(1, J) / 1500); break; 
+            case UniversityRank.STARTUP: base = 300000 * (Math.max(1, J) / 30); break;
+            case UniversityRank.TIER_3: base = 1000000 * (Math.max(1, J) / 150); break;
+            case UniversityRank.TIER_2: base = 2000000 * (Math.max(1, J) / 200); break;
+            case UniversityRank.TIER_1: base = 4000000 * (Math.max(1, J) / 500); break;
+            case UniversityRank.PROJECT_211: base = 8000000 * (Math.max(1, J) / 1000); break;
+            case UniversityRank.PROJECT_985: base = 10000000 * (Math.max(1, J) / 1500); break;
+        }
+    } else if (state.uniType1 === UniType1.PRIVATE) {
+        // Private universities get smaller government grants but rely more on tuition
+        switch (state.rank) {
+            case UniversityRank.STARTUP: base = 100000 * (Math.max(1, J) / 30); break;
+            case UniversityRank.TIER_3: base = 300000 * (Math.max(1, J) / 150); break;
+            case UniversityRank.TIER_2: base = 600000 * (Math.max(1, J) / 200); break;
+            case UniversityRank.TIER_1: base = 1200000 * (Math.max(1, J) / 500); break;
+            case UniversityRank.PROJECT_211: base = 2500000 * (Math.max(1, J) / 1000); break;
+            case UniversityRank.PROJECT_985: base = 3500000 * (Math.max(1, J) / 1500); break;
         }
     }
     if (state.badges.includes('市重点')) base += 200000; 
@@ -200,7 +210,7 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
     // Keeping logic simple: Prep period might not have students but has expenses.
 
     const totalExpense = researchAllocated + cafeteriaAllocated + studentAllocated + facultyAllocated + maintenanceCostActual + salaryRequiredDaily;
-    const annualizedTuition = (currentStudents * fs.tuitionFeePerYear * 1000) / 360; 
+    const annualizedTuition = (currentStudents * fs.tuitionFeePerYear * 1000) / 365;
     const isOperational = currentStudents > 0 && gameState.faculty.length > 0;
     const potentialDailyGrant = calculateDailyIncome(gameState);
     const dailyGrant = isOperational ? potentialDailyGrant : (isPrepPeriod && gameState.uniType1 === UniType1.PUBLIC ? potentialDailyGrant * 0.5 : 0); // Reduced grant during prep if no students

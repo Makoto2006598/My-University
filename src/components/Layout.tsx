@@ -1,16 +1,13 @@
 
 import React from 'react';
-import { ViewMode } from '../types';
-import { LayoutDashboard, MessageSquareText, Settings } from 'lucide-react';
+import { LayoutDashboard, Settings } from 'lucide-react';
 import { MusicPlayer } from './MusicPlayer';
 
 interface LayoutProps {
-  currentMode: ViewMode;
-  setMode: (mode: ViewMode) => void;
   children: React.ReactNode;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ currentMode, setMode, children }) => {
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="flex h-screen w-screen bg-orange-50 text-stone-800 overflow-hidden relative">
       {/* Sidebar */}
@@ -25,29 +22,10 @@ export const Layout: React.FC<LayoutProps> = ({ currentMode, setMode, children }
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          <button
-            onClick={() => setMode(ViewMode.PROTOTYPE)}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-              currentMode === ViewMode.PROTOTYPE
-                ? 'bg-orange-100 text-orange-700 shadow-sm'
-                : 'text-stone-500 hover:bg-stone-50 hover:text-stone-800'
-            }`}
-          >
+          <div className="w-full flex items-center gap-3 p-3 rounded-xl bg-orange-100 text-orange-700 shadow-sm">
             <LayoutDashboard className="w-6 h-6" />
             <span className="hidden lg:block font-medium">游戏 (Game)</span>
-          </button>
-
-          <button
-            onClick={() => setMode(ViewMode.CONSULTANT)}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-              currentMode === ViewMode.CONSULTANT
-                ? 'bg-emerald-100 text-emerald-700 shadow-sm'
-                : 'text-stone-500 hover:bg-stone-50 hover:text-stone-800'
-            }`}
-          >
-            <MessageSquareText className="w-6 h-6" />
-            <span className="hidden lg:block font-medium">技术顾问 (AI)</span>
-          </button>
+          </div>
         </nav>
 
         <div className="p-4 border-t border-orange-100">

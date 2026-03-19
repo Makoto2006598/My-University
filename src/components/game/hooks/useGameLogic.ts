@@ -56,14 +56,19 @@ export const useGameLogic = (
                 const currentDate = getGameDate(prev.day);
                 let newBudgetConfirmed = prev.budgetConfirmed;
                 
-                // Monthly Budget Logic
-                if (currentDate.date === 2) newBudgetConfirmed = true; 
-                if (currentDate.date === 1 && prev.day % 30 !== 1) newBudgetConfirmed = false;
+                // Monthly Budget Logic: reset on 1st of each month, auto-confirm on 2nd
+                if (currentDate.date === 1 && prev.day > 1) newBudgetConfirmed = false;
+                if (currentDate.date === 2) newBudgetConfirmed = true;
 
                 // Admissions Logic
                 let newAdmissionsPhase = prev.admissionsPhase;
                 let newIncoming = [...prev.incomingStudents];
-                
+
+                // IDLE -> PREP on July 1
+                if (currentDate.year >= 2027 && currentDate.month === 7 && currentDate.date === 1 && newAdmissionsPhase === AdmissionsPhase.IDLE) {
+                    newAdmissionsPhase = AdmissionsPhase.PREP;
+                }
+                // PREP -> RECRUITING on July 15
                 if (currentDate.year >= 2027 && currentDate.month === 7 && currentDate.date === 15 && newAdmissionsPhase === AdmissionsPhase.PREP) {
                     newAdmissionsPhase = AdmissionsPhase.RECRUITING;
                 }
@@ -538,9 +543,7 @@ export const useGameLogic = (
             let bonusGrantDays = prev.liaison.grantDaysLeft;
             if (def.rewards.grant) {
                 bonusGrantAmount += def.rewards.grant.amount;
-                bonusGrantDays = Math.max(bonusGrantDays, def.rewards.grant.days); // Or add? "Extend" usually implies add or max. Let's add.
-                // Actually if currently running, let's stack duration.
-                bonusGrantDays += def.rewards.grant.days; 
+                bonusGrantDays += def.rewards.grant.days;
             }
 
             return {

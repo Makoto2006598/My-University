@@ -165,7 +165,7 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                                     <div className="absolute inset-0 opacity-20" style={{backgroundImage: 'repeating-linear-gradient(45deg, #fbbf24 0, #fbbf24 5px, transparent 5px, transparent 10px)'}}></div>
                                     <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-800 text-[10px] font-bold">
                                         <Hammer className="w-6 h-6 text-orange-500 animate-bounce mb-1" />
-                                        <span>{Math.floor(((BUILDINGS[cell.building].constructionTime - (cell.constructionLeft || 0)) / BUILDINGS[cell.building].constructionTime) * 100)}%</span>
+                                        <span>{Math.floor(((BUILDINGS[cell.building].constructionTime - (cell.constructionLeft || 0)) / Math.max(1, BUILDINGS[cell.building].constructionTime)) * 100)}%</span>
                                     </div>
                                 </div>
                             )}

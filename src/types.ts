@@ -1,9 +1,4 @@
 
-export enum ViewMode {
-  PROTOTYPE = 'PROTOTYPE',
-  CONSULTANT = 'CONSULTANT'
-}
-
 export type SidebarTab = 'OVERVIEW' | 'BUILD' | 'ACADEMIC' | 'HR' | 'PUBLICITY' | 'LIAISON' | 'ADMISSIONS' | 'FINANCE' | null;
 
 export enum BuildingType {
@@ -385,14 +380,6 @@ export interface GameState {
   ministryPenaltyEndDay?: number; // If set and > currentDay, income is reduced
 }
 
-export interface EngineRecommendationRequest {
-  targetPlatform: string[];
-  teamSize: string;
-  graphicsStyle: string;
-  budget: string;
-  programmingLanguage: string;
-  specificFeatures: string;
-}
 
 export const GRID_SIZE = 54;
 export const INITIAL_MONEY_PUBLIC = 200000000; // 200M
