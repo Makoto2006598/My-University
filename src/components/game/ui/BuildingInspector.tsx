@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { BuildingDef, CellData, VariantDef } from '../../../types';
+import { BuildingDef, CellData, VariantDef, ConstructionStatus } from '../../../types';
+import { BUILDINGS } from '../../../data/gameData';
 import { formatMoney } from '../../../utils/gameUtils';
-import { Edit3, X, Trash2 } from 'lucide-react';
+import { Edit3, X, Trash2, Hammer } from 'lucide-react';
 
 interface BuildingInspectorProps {
     selectedBuilding: {id: string, def: BuildingDef, variant?: VariantDef, cell: CellData} | null;
@@ -18,54 +19,89 @@ export const BuildingInspector: React.FC<BuildingInspectorProps> = ({
 }) => {
     if (!selectedBuilding) return null;
 
+    const { def, variant, cell } = selectedBuilding;
+    const isConstructing = cell.constructionStatus === ConstructionStatus.CONSTRUCTING;
+    const constructionProgress = isConstructing
+        ? Math.floor(((def.constructionTime - (cell.constructionLeft || 0)) / Math.max(1, def.constructionTime)) * 100)
+        : 100;
+
+    // Use variant stats if available, otherwise fall back to base
+    const maintenance = variant?.maintenance ?? def.maintenance;
+    const capacity = variant?.capacity ?? def.capacity;
+    const revenue = variant?.revenue ?? def.revenue;
+    const happiness = variant?.happiness ?? def.happiness;
+
     return (
         <div className="absolute bottom-32 left-4 bg-white/95 backdrop-blur border border-orange-200 p-4 rounded-xl shadow-xl w-72 z-30 animate-in slide-in-from-left-4 fade-in">
             <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl shadow-sm ${selectedBuilding.def.color} text-white`}>
-                        {selectedBuilding.def.icon}
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl shadow-sm ${def.color} text-white`}>
+                        {def.icon}
                     </div>
                     <div>
                         <div className="font-bold text-stone-800 text-sm flex items-center gap-2">
                             {renameValue}
                             <button onClick={() => { const name = prompt("重命名建筑:", renameValue); if(name) onRenameSubmit(name); }} className="text-stone-400 hover:text-stone-600"><Edit3 className="w-3 h-3"/></button>
                         </div>
-                        <div className="text-[10px] text-stone-500">{selectedBuilding.variant?.label || selectedBuilding.def.name}</div>
+                        <div className="text-[10px] text-stone-500">{variant?.label || def.name}</div>
                     </div>
                 </div>
                 <button onClick={onClose} className="text-stone-400 hover:text-stone-600"><X className="w-4 h-4"/></button>
             </div>
-            
+
+            {/* Construction Progress */}
+            {isConstructing && (
+                <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-xs text-amber-700 font-bold mb-1.5">
+                        <Hammer className="w-3.5 h-3.5 animate-bounce" />
+                        <span>施工中... 剩余 {cell.constructionLeft} 天</span>
+                    </div>
+                    <div className="w-full bg-amber-200 rounded-full h-2">
+                        <div
+                            className="bg-amber-500 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${constructionProgress}%` }}
+                        />
+                    </div>
+                    <div className="text-right text-[10px] text-amber-600 mt-0.5 font-mono">{constructionProgress}%</div>
+                </div>
+            )}
+
             <div className="space-y-2 text-xs text-stone-600">
                 <div className="flex justify-between border-b border-stone-100 pb-1">
                     <span>维护费用</span>
-                    <span className="font-mono text-red-500">-{formatMoney(selectedBuilding.def.maintenance)}/m</span>
+                    <span className="font-mono text-red-500">-{formatMoney(maintenance)}/月</span>
                 </div>
-                {selectedBuilding.def.capacity && (
+                {capacity !== undefined && capacity > 0 && (
                     <div className="flex justify-between border-b border-stone-100 pb-1">
                         <span>容量</span>
-                        <span className="font-mono">{selectedBuilding.def.capacity} 人</span>
+                        <span className="font-mono">{capacity} 人</span>
                     </div>
                 )}
-                {selectedBuilding.def.revenue && (
+                {revenue !== undefined && revenue > 0 && (
                     <div className="flex justify-between border-b border-stone-100 pb-1">
                         <span>预估营收</span>
-                        <span className="font-mono text-emerald-600">+{formatMoney(selectedBuilding.def.revenue)}/m</span>
+                        <span className="font-mono text-emerald-600">+{formatMoney(revenue)}/月</span>
                     </div>
                 )}
-                {selectedBuilding.def.happiness && (
+                {happiness !== undefined && happiness !== 0 && (
                     <div className="flex justify-between border-b border-stone-100 pb-1">
                         <span>满意度影响</span>
-                        <span className={`font-mono ${selectedBuilding.def.happiness > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {selectedBuilding.def.happiness > 0 ? '+' : ''}{selectedBuilding.def.happiness}
+                        <span className={`font-mono ${happiness > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {happiness > 0 ? '+' : ''}{happiness}
                         </span>
                     </div>
                 )}
+                {cell.rotation !== undefined && cell.rotation !== 0 && (
+                    <div className="flex justify-between border-b border-stone-100 pb-1">
+                        <span>朝向</span>
+                        <span className="font-mono text-stone-500">已旋转 90°</span>
+                    </div>
+                )}
                 <div className="pt-2 text-[10px] text-stone-400 leading-tight">
-                    {selectedBuilding.variant?.description || selectedBuilding.def.description || "暂无描述。"}
+                    {variant?.description || def.description || "暂无描述。"}
                 </div>
-                
-                <button 
+
+                <button
                     onClick={() => onRemove(selectedBuilding.id)}
                     className="mt-4 w-full py-2 bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 rounded-lg flex items-center justify-center gap-2 transition-all"
                 >
