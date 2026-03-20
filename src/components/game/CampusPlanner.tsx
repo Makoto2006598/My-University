@@ -14,6 +14,7 @@ import {
     generateId, formatMoney, getGameDate, calculateStats, getThickLinePoints, createInitialGrid 
 } from '../../utils/gameUtils';
 import { SaveManager } from '../../utils/saveManager';
+import { getDeviceType, DeviceType } from '../../utils/deviceDetect';
 import { useGameLogic } from './hooks/useGameLogic';
 
 // UI Components
@@ -63,7 +64,11 @@ export const CampusPlanner: React.FC = () => {
   const [dragPath, setDragPath] = useState<{x: number, y: number}[]>([]);
   const [selectedBuilding, setSelectedBuilding] = useState<{id: string, def: BuildingDef, variant?: VariantDef, cell: CellData} | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [viewState, setViewState] = useState({ x: 0, y: 0, zoom: 0.6, pitch: 55, yaw: 0 });
+  const [deviceType] = useState<DeviceType>(() => getDeviceType());
+  const [viewState, setViewState] = useState(() => {
+    const zoom = deviceType === 'phone' ? 0.4 : deviceType === 'pad' ? 0.5 : 0.6;
+    return { x: 0, y: 0, zoom, pitch: 55, yaw: 0 };
+  });
   
   // Interaction Refs
   const keysPressed = useRef<Set<string>>(new Set());
@@ -500,6 +505,7 @@ export const CampusPlanner: React.FC = () => {
             }} isMenuExpanded={isMenuExpanded} setIsMenuExpanded={setIsMenuExpanded}
             selectedTool={selectedTool} setSelectedTool={setSelectedTool} selectedVariantIndex={selectedVariantIndex} setSelectedVariantIndex={setSelectedVariantIndex}
             isRotated={isRotated} onToggleRotate={() => setIsRotated(p => !p)}
+            deviceType={deviceType}
             is2DMode={is2DMode} onToggle2D={() => {
                 const newIs2D = !is2DMode;
                 setIs2DMode(newIs2D);
@@ -554,14 +560,49 @@ export const CampusPlanner: React.FC = () => {
             onQuickSave={() => { if(currentSlot) SaveManager.save(currentSlot, gameState, setupData); }} onSaveToSlot={(s) => { SaveManager.save(s, gameState, setupData); setRefreshKey(p=>p+1); }} onLoadSlot={handleLoadSlot} refreshKey={refreshKey}
         />
         
-        <RecruitmentConfigModal isOpen={recruitmentConfigOpen} onClose={() => setRecruitmentConfigOpen(false)} method={selectedRecruitMethod} count={recruitCount} setCount={setRecruitCount} 
+        <RecruitmentConfigModal isOpen={recruitmentConfigOpen} onClose={() => setRecruitmentConfigOpen(false)} method={selectedRecruitMethod} count={recruitCount} setCount={setRecruitCount}
             onConfirm={() => {
-                // Inline simple recruit logic for brevity, ideally in hook but requires complex params
-                setGameState(p => ({...p, money: p.money - (selectedRecruitMethod === RecruitmentMethod.SOCIAL ? 5000 : 0) * recruitCount, recruitAvailable: false}));
-                const newHires: Faculty[] = Array(recruitCount).fill(null).map(() => ({ id: generateId(), name: generateName(), title: FacultyTitle.LECTURER, department: CollegeType.ARTS, researchAbility: 50, managementAbility: 50, salary: 8000, hireDate: gameState.day, satisfaction: 80 }));
+                const methodCosts: Record<string, number> = {
+                    [RecruitmentMethod.MINISTRY]: 0, [RecruitmentMethod.SOCIAL]: 5000,
+                    [RecruitmentMethod.HEADHUNTER_LOW]: 100000, [RecruitmentMethod.HEADHUNTER_MID]: 500000, [RecruitmentMethod.HEADHUNTER_HIGH]: 1000000
+                };
+                const cost = (methodCosts[selectedRecruitMethod] || 0) * recruitCount;
+                setGameState(p => ({...p, money: p.money - cost, recruitAvailable: false}));
+
+                const generateFaculty = (): Faculty => {
+                    const r = Math.random;
+                    const colleges = gameState.colleges.length > 0 ? gameState.colleges.map(c => c.type) : [CollegeType.ARTS];
+                    const dept = colleges[Math.floor(r() * colleges.length)];
+                    const roll = r();
+                    let title: FacultyTitle, minA: number, maxA: number, baseSal: number;
+                    switch (selectedRecruitMethod) {
+                        case RecruitmentMethod.HEADHUNTER_HIGH:
+                            title = roll < 0.4 ? FacultyTitle.ACADEMICIAN : roll < 0.8 ? FacultyTitle.PROF : FacultyTitle.ASSOC_PROF;
+                            minA = 70; maxA = 100; baseSal = 30000; break;
+                        case RecruitmentMethod.HEADHUNTER_MID:
+                            title = roll < 0.3 ? FacultyTitle.PROF : roll < 0.8 ? FacultyTitle.ASSOC_PROF : FacultyTitle.LECTURER;
+                            minA = 55; maxA = 90; baseSal = 20000; break;
+                        case RecruitmentMethod.HEADHUNTER_LOW:
+                            title = roll < 0.2 ? FacultyTitle.ASSOC_PROF : roll < 0.7 ? FacultyTitle.LECTURER : FacultyTitle.TA;
+                            minA = 40; maxA = 75; baseSal = 12000; break;
+                        case RecruitmentMethod.SOCIAL:
+                            title = roll < 0.1 ? FacultyTitle.ASSOC_PROF : roll < 0.5 ? FacultyTitle.LECTURER : FacultyTitle.TA;
+                            minA = 25; maxA = 70; baseSal = 9000; break;
+                        default:
+                            title = roll < 0.05 ? FacultyTitle.ASSOC_PROF : roll < 0.4 ? FacultyTitle.LECTURER : FacultyTitle.TA;
+                            minA = 20; maxA = 65; baseSal = 8000; break;
+                    }
+                    return { id: generateId(), name: generateName(), title, department: dept,
+                        researchAbility: Math.floor(minA + r() * (maxA - minA)),
+                        managementAbility: Math.floor(minA + r() * (maxA - minA)),
+                        salary: Math.floor(baseSal * (0.8 + r() * 0.4)),
+                        hireDate: gameState.day, satisfaction: 70 + Math.floor(r() * 20) };
+                };
+                const newHires: Faculty[] = Array(recruitCount).fill(null).map(() => generateFaculty());
                 setPotentialHires(newHires); setRecruitmentConfigOpen(false); setRecruitmentOpen(true);
-            }} 
-            getCost={(m) => m === RecruitmentMethod.SOCIAL ? 5000 : 0} getProb={() => "Standard"} 
+            }}
+            getCost={(m) => m === RecruitmentMethod.SOCIAL ? 5000 : m === RecruitmentMethod.HEADHUNTER_LOW ? 100000 : m === RecruitmentMethod.HEADHUNTER_MID ? 500000 : m === RecruitmentMethod.HEADHUNTER_HIGH ? 1000000 : 0}
+            getProb={(m) => m === RecruitmentMethod.HEADHUNTER_HIGH ? "院士/教授" : m === RecruitmentMethod.HEADHUNTER_MID ? "教授/副教授" : m === RecruitmentMethod.HEADHUNTER_LOW ? "讲师/助教" : m === RecruitmentMethod.SOCIAL ? "助教/讲师" : "助教为主"}
         />
         <RecruitmentResultModal isOpen={recruitmentOpen} hires={potentialHires} onHire={(f) => { setGameState(p => ({...p, faculty: [...p.faculty, f]})); setPotentialHires(p => p.filter(h => h.id !== f.id)); }} onClose={() => setRecruitmentOpen(false)} />
         
