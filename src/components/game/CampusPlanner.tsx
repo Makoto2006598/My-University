@@ -532,7 +532,7 @@ export const CampusPlanner: React.FC = () => {
                         className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full ${isBudgetBlocking ? 'text-stone-300 cursor-not-allowed' : 'hover:bg-stone-200 active:bg-stone-300 text-stone-400 hover:text-stone-600'}`}
                     ><X className="w-6 h-6"/></button>
                 </div>
-                <div className="flex-1 overflow-hidden relative">
+                <div className="flex-1 overflow-auto relative">
                     {activeSidebarTab === 'FINANCE' && <FinancePanel gameState={gameState} setGameState={setGameState} currentStats={currentStats} lockedAllocations={lockedAllocations} setLockedAllocations={setLockedAllocations} onBudgetConfirmed={() => { handlers.handleSpeedChange(previousSpeed || 1); }} />}
                     {activeSidebarTab === 'ACADEMIC' && <AcademicPanel gameState={gameState} setGameState={setGameState} onAssignDean={(cid, role) => { setSelectedCollegeIdForDean(cid); setSelectedDeanRole(role); setShowFacultySelectModal(true); }} />}
                     {activeSidebarTab === 'HR' && <HRPanel gameState={gameState} onFire={(fid) => setGameState(p=>({...p, faculty: p.faculty.filter(f=>f.id!==fid)}))} onOpenRecruit={(m) => { setSelectedRecruitMethod(m); setRecruitmentConfigOpen(true); }} />}
