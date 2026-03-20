@@ -3,6 +3,7 @@ import React from 'react';
 import { SidebarTab, BuildingType } from '../../../types';
 import { BUILDINGS, VARIANTS } from '../../../data/gameData';
 import { formatMoney } from '../../../utils/gameUtils';
+import { DeviceType } from '../../../utils/deviceDetect';
 import {
     LayoutDashboard, Hammer, GraduationCap, Briefcase, Megaphone, UserPlus, PieChart as PieChartIcon,
     ChevronDown, ChevronUp, Landmark, RotateCw
@@ -21,6 +22,7 @@ interface GameHUDProps {
     onToggle2D: () => void;
     isRotated?: boolean;
     onToggleRotate?: () => void;
+    deviceType?: DeviceType;
 }
 
 const TAB_MAP: Record<string, string> = {
@@ -41,7 +43,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     selectedTool, setSelectedTool,
     selectedVariantIndex, setSelectedVariantIndex,
     is2DMode, onToggle2D,
-    isRotated, onToggleRotate
+    isRotated, onToggleRotate,
+    deviceType = 'pc'
 }) => {
     const getSelectedCost = (type: BuildingType, variantIdx: number) => {
         const variants = VARIANTS[type];
@@ -136,7 +139,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                     </div>
                     <div className="flex items-center gap-2 mt-2">
                         {/* Rotate button for touch users */}
-                        {onToggleRotate && selectedTool !== BuildingType.NONE && selectedTool !== BuildingType.ROAD && (
+                        {deviceType !== 'pc' && onToggleRotate && selectedTool !== BuildingType.NONE && selectedTool !== BuildingType.ROAD && (
                             <button
                                 onClick={onToggleRotate}
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm border transition-all min-h-[36px] ${
@@ -146,12 +149,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                                 <RotateCw className="w-3.5 h-3.5" /> 旋转
                             </button>
                         )}
-                        <div className="text-[10px] text-stone-600 bg-white/80 px-3 py-1 rounded-full backdrop-blur shadow-sm border border-stone-200 hidden sm:block">
-                            按 <span className="font-bold text-orange-600">Q / E</span> 旋转建筑 | <span className="font-bold text-red-500">右键</span> 拆除
-                        </div>
-                        <div className="text-[10px] text-stone-600 bg-white/80 px-3 py-1 rounded-full backdrop-blur shadow-sm border border-stone-200 sm:hidden">
-                            点击放置 | <span className="font-bold text-red-500">长按</span> 拆除
-                        </div>
+                        {deviceType === 'pc' ? (
+                            <div className="text-[10px] text-stone-600 bg-white/80 px-3 py-1 rounded-full backdrop-blur shadow-sm border border-stone-200">
+                                按 <span className="font-bold text-orange-600">Q / E</span> 旋转建筑 | <span className="font-bold text-red-500">右键</span> 拆除
+                            </div>
+                        ) : (
+                            <div className="text-[10px] text-stone-600 bg-white/80 px-3 py-1 rounded-full backdrop-blur shadow-sm border border-stone-200">
+                                点击放置 | <span className="font-bold text-red-500">长按</span> 拆除
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
