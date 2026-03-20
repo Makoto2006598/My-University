@@ -13,20 +13,20 @@ export const generateName = (): string => {
 };
 
 export const COLLEGES_DEF: Record<CollegeType, CollegeDef> = {
-    [CollegeType.ARTS]: { type: CollegeType.ARTS, name: '文学院', category: 'BASE', description: '人文学科的基础。' },
-    [CollegeType.SCIENCE]: { type: CollegeType.SCIENCE, name: '理学院', category: 'BASE', description: '自然科学的基础。' },
-    [CollegeType.MEDICINE]: { type: CollegeType.MEDICINE, name: '医学院', category: 'BASE', description: '培养医学人才。' },
-    [CollegeType.CS]: { type: CollegeType.CS, name: '计算机学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, description: '新工科核心。' },
-    [CollegeType.IC]: { type: CollegeType.IC, name: '集成电路学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, description: '高精尖科技。' },
-    [CollegeType.ROBOTICS]: { type: CollegeType.ROBOTICS, name: '机器人学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, description: '未来工业基础。' },
-    [CollegeType.CIVIL]: { type: CollegeType.CIVIL, name: '土木学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '传统基建。' },
-    [CollegeType.ARCH]: { type: CollegeType.ARCH, name: '建筑学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '建筑与设计。' },
-    [CollegeType.MECH]: { type: CollegeType.MECH, name: '机械学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '工业制造。' },
-    [CollegeType.ELEC]: { type: CollegeType.ELEC, name: '电气学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '能源与动力。' },
-    [CollegeType.LANG]: { type: CollegeType.LANG, name: '外国语学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '国际交流。' },
-    [CollegeType.LAW]: { type: CollegeType.LAW, name: '法学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '法治社会基石。' },
-    [CollegeType.TRADE]: { type: CollegeType.TRADE, name: '贸易学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '国际商业。' },
-    [CollegeType.ECON]: { type: CollegeType.ECON, name: '经济学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '经济理论。' },
+    [CollegeType.ARTS]: { type: CollegeType.ARTS, name: '文学院', category: 'BASE', description: '涵盖中文、历史、哲学与新媒体等学科，是人文精神与校园文化底蕴的根基，也是开设文科类学院的前置条件。' },
+    [CollegeType.SCIENCE]: { type: CollegeType.SCIENCE, name: '理学院', category: 'BASE', description: '数学、物理、化学三大基础学科的摇篮，为工科和医学提供理论支撑，是开设工程类学院的前置条件。' },
+    [CollegeType.MEDICINE]: { type: CollegeType.MEDICINE, name: '医学院', category: 'BASE', description: '设有临床医学、基础医学与口腔医学专业，培养周期长、投入高，但能显著提升学校声望与社会认可度。' },
+    [CollegeType.CS]: { type: CollegeType.CS, name: '计算机学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, description: '新工科旗舰学院，涵盖人工智能、软件工程与网络安全方向，招生热门，科研产出高，企业合作机会丰富。' },
+    [CollegeType.IC]: { type: CollegeType.IC, name: '集成电路学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, description: '聚焦芯片设计、半导体工艺与EDA工具开发，属国家战略急需学科，可获额外科研经费与政策支持。' },
+    [CollegeType.ROBOTICS]: { type: CollegeType.ROBOTICS, name: '机器人学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, description: '融合机械、电子与人工智能的交叉学科，面向智能制造与无人系统，产学研合作前景广阔。' },
+    [CollegeType.CIVIL]: { type: CollegeType.CIVIL, name: '土木学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '研究结构工程、岩土力学与交通规划，虽为传统工科但就业稳定，承担大量横向课题与工程咨询项目。' },
+    [CollegeType.ARCH]: { type: CollegeType.ARCH, name: '建筑学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '培养建筑设计、城市规划与景观设计人才，五年制本科教育，注重艺术素养与工程技术的结合。' },
+    [CollegeType.MECH]: { type: CollegeType.MECH, name: '机械学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '涵盖机械设计、制造自动化与车辆工程方向，实验设备投入大，但与制造业企业合作紧密，实习就业率高。' },
+    [CollegeType.ELEC]: { type: CollegeType.ELEC, name: '电气学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '专注电力系统、电机驱动与新能源技术，毕业生就业面向国家电网与能源企业，行业需求稳定。' },
+    [CollegeType.LANG]: { type: CollegeType.LANG, name: '外国语学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '开设英语、日语、法语等语种专业，承担全校大学外语教学任务，是国际交流合作与留学生项目的核心支撑。' },
+    [CollegeType.LAW]: { type: CollegeType.LAW, name: '法学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '培养法官、律师与法务人才，设有模拟法庭与法律援助中心，司法考试通过率直接影响学院声望。' },
+    [CollegeType.TRADE]: { type: CollegeType.TRADE, name: '贸易学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '聚焦国际贸易实务、跨境电商与供应链管理，与海关、港口及外贸企业建立实训基地，就业导向鲜明。' },
+    [CollegeType.ECON]: { type: CollegeType.ECON, name: '经济学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '研究宏观经济、金融学与计量分析，学术氛围浓厚，论文产出高，优秀毕业生多进入央行、券商与智库。' },
 };
 
 export const MAJORS_DEF: MajorDef[] = [
