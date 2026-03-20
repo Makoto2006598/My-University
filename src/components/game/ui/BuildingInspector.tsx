@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { BuildingDef, CellData, VariantDef, ConstructionStatus } from '../../../types';
+import { BuildingDef, CellData, VariantDef, ConstructionStatus, BuildingType, ServiceCoverage } from '../../../types';
 import { BUILDINGS } from '../../../data/gameData';
 import { formatMoney } from '../../../utils/gameUtils';
-import { Edit3, X, Trash2, Hammer } from 'lucide-react';
+import { Edit3, X, Trash2, Hammer, AlertTriangle, Utensils, BookOpen, Trees } from 'lucide-react';
 
 interface BuildingInspectorProps {
     selectedBuilding: {id: string, def: BuildingDef, variant?: VariantDef, cell: CellData} | null;
@@ -12,10 +12,13 @@ interface BuildingInspectorProps {
     onRenameSubmit: (newName: string) => void;
     onClose: () => void;
     onRemove: (id: string) => void;
+    serviceCoverage?: { food: boolean; study: boolean; recreation: boolean };
+    isConnected?: boolean;
 }
 
 export const BuildingInspector: React.FC<BuildingInspectorProps> = ({
-    selectedBuilding, renameValue, onRenameChange, onRenameSubmit, onClose, onRemove
+    selectedBuilding, renameValue, onRenameChange, onRenameSubmit, onClose, onRemove,
+    serviceCoverage, isConnected
 }) => {
     if (!selectedBuilding) return null;
 
@@ -63,6 +66,34 @@ export const BuildingInspector: React.FC<BuildingInspectorProps> = ({
                         />
                     </div>
                     <div className="text-right text-[10px] text-amber-600 mt-0.5 font-mono">{constructionProgress}%</div>
+                </div>
+            )}
+
+            {/* 道路连通警告 */}
+            {isConnected === false && (
+                <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-xs text-red-700 font-bold">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>未连通校门 - 建筑无法正常运作</span>
+                    </div>
+                </div>
+            )}
+
+            {/* 服务覆盖状态 */}
+            {serviceCoverage && (cell.building === BuildingType.DORMITORY || cell.building === BuildingType.LECTURE_HALL) && (
+                <div className="mb-3 p-2 bg-stone-50 border border-stone-200 rounded-lg">
+                    <div className="text-[10px] text-stone-500 mb-1.5 font-medium">周边设施覆盖</div>
+                    <div className="flex gap-3 text-xs">
+                        <div className={`flex items-center gap-1 ${serviceCoverage.food ? 'text-orange-600' : 'text-stone-300'}`}>
+                            <Utensils className="w-3 h-3" /> 餐饮
+                        </div>
+                        <div className={`flex items-center gap-1 ${serviceCoverage.study ? 'text-blue-600' : 'text-stone-300'}`}>
+                            <BookOpen className="w-3 h-3" /> 学习
+                        </div>
+                        <div className={`flex items-center gap-1 ${serviceCoverage.recreation ? 'text-green-600' : 'text-stone-300'}`}>
+                            <Trees className="w-3 h-3" /> 休闲
+                        </div>
+                    </div>
                 </div>
             )}
 
