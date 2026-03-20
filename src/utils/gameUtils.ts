@@ -173,13 +173,33 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
              if (variants && cell.variantId) stats = variants.find(v => v.id === cell.variantId) || null;
              if (!stats) stats = BUILDINGS[cell.building];
 
-             // 检查道路连通性：未连通建筑不计入容量和收入
+             // 使用缓存的连通性数据（由 updateFullGrid 预计算）
              const def = BUILDINGS[cell.building];
              const needsRoad = def.requiresRoadConnection !== false;
-             const isConnected = !needsRoad || checkConnectedRoadAdjacency(grid, cell.x, cell.y,
-               (() => { const v = variants?.find(v2 => v2.id === cell.variantId); const w = v ? v.width : (def.width || 1); const h = v ? v.height : (def.height || 1); return cell.rotation ? h : w; })(),
-               (() => { const v = variants?.find(v2 => v2.id === cell.variantId); const w = v ? v.width : (def.width || 1); const h = v ? v.height : (def.height || 1); return cell.rotation ? w : h; })()
-             ).valid;
+             const variant2 = variants?.find(v2 => v2.id === cell.variantId);
+             const bw = variant2 ? variant2.width : (def.width || 1);
+             const bh = variant2 ? variant2.height : (def.height || 1);
+             const w = cell.rotation ? bh : bw;
+             const h = cell.rotation ? bw : bh;
+             // 快速检查：遍历建筑边缘看是否有已连通道路相邻
+             let isConnected = !needsRoad;
+             if (!isConnected) {
+               outer: for (let dy2 = 0; dy2 < h; dy2++) {
+                 for (let dx2 = 0; dx2 < w; dx2++) {
+                   if (dy2 > 0 && dy2 < h - 1 && dx2 > 0 && dx2 < w - 1) continue; // 只检查边缘
+                   const adjCells = [
+                     [cell.x + dx2, cell.y + dy2 - 1], [cell.x + dx2, cell.y + dy2 + 1],
+                     [cell.x + dx2 - 1, cell.y + dy2], [cell.x + dx2 + 1, cell.y + dy2]
+                   ];
+                   for (const [ax, ay] of adjCells) {
+                     if (ax < 0 || ax >= GRID_SIZE || ay < 0 || ay >= GRID_SIZE) continue;
+                     if (ax >= cell.x && ax < cell.x + w && ay >= cell.y && ay < cell.y + h) continue;
+                     const adj = grid[ay][ax];
+                     if (adj.isConnectedToCampus === true) { isConnected = true; break outer; }
+                   }
+                 }
+               }
+             }
 
              // Count logic
              if (cell.building !== BuildingType.ROAD && cell.building !== BuildingType.CITY_ROAD && cell.building !== BuildingType.PARK) {
@@ -190,18 +210,21 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
              if (cell.building === BuildingType.LECTURE_HALL) lectureHallCount++;
              if (cell.building === BuildingType.LIBRARY) libraryCount++;
 
-             // 服务覆盖对有capacity建筑的加成
+             // 服务覆盖: 直接读取缓存的 serviceCoverage 而非重新计算
              if (isConnected && stats && cell.constructionStatus === ConstructionStatus.COMPLETED) {
-               const svc = getBuildingServiceInfo(grid, cell.x, cell.y);
+               const cov = cell.serviceCoverage;
+               const hasFood = !!cov?.food;
+               const hasStudy = !!cov?.study;
+               const hasRec = !!cov?.recreation;
                if (cell.building === BuildingType.DORMITORY) {
-                 if (svc.food) serviceCoverageBonus += 5;
-                 if (svc.study) serviceCoverageBonus += 3;
-                 if (svc.recreation) serviceCoverageBonus += 3;
-                 if (!svc.food && !svc.study && !svc.recreation) serviceCoverageBonus -= 8;
+                 if (hasFood) serviceCoverageBonus += 5;
+                 if (hasStudy) serviceCoverageBonus += 3;
+                 if (hasRec) serviceCoverageBonus += 3;
+                 if (!hasFood && !hasStudy && !hasRec) serviceCoverageBonus -= 8;
                }
                if (cell.building === BuildingType.LECTURE_HALL) {
-                 if (svc.food) serviceCoverageBonus += 2;
-                 if (svc.recreation) serviceCoverageBonus += 1;
+                 if (hasFood) serviceCoverageBonus += 2;
+                 if (hasRec) serviceCoverageBonus += 1;
                }
              }
 

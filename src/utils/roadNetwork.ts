@@ -87,52 +87,48 @@ export const calculateRoadShapes = (grid: CellData[][]): void => {
  * 连通的道路和紧邻连通道路的建筑才能正常运作
  */
 export const calculateRoadConnectivity = (grid: CellData[][]): void => {
-  // 先清除所有连通标记
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
-      grid[y][x].isConnectedToCampus = undefined;
-    }
-  }
-
-  // BFS 从所有校园入口出发
+  // 单次遍历: 清除标记 + 收集入口
   const queue: [number, number][] = [];
-  const visited = new Set<string>();
+  const visited = new Uint8Array(GRID_SIZE * GRID_SIZE);
 
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
-      if (isCampusEntrance(grid[y][x])) {
-        const key = `${x},${y}`;
-        if (!visited.has(key)) {
-          visited.add(key);
+      const cell = grid[y][x];
+      cell.isConnectedToCampus = undefined;
+      if (isCampusEntrance(cell)) {
+        const idx = y * GRID_SIZE + x;
+        if (!visited[idx]) {
+          visited[idx] = 1;
           queue.push([x, y]);
-          grid[y][x].isConnectedToCampus = true;
+          cell.isConnectedToCampus = true;
         }
       }
     }
   }
 
-  // BFS 沿道路扩展
-  const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
-  while (queue.length > 0) {
-    const [cx, cy] = queue.shift()!;
-    for (const [dx, dy] of dirs) {
-      const nx = cx + dx;
-      const ny = cy + dy;
+  // BFS 沿道路扩展（用数组索引代替 Set<string>）
+  let head = 0;
+  while (head < queue.length) {
+    const [cx, cy] = queue[head++];
+    const nx0 = cx, ny0 = cy - 1;
+    const nx1 = cx, ny1 = cy + 1;
+    const nx2 = cx - 1, ny2 = cy;
+    const nx3 = cx + 1, ny3 = cy;
+    const neighbors = [[nx0, ny0], [nx1, ny1], [nx2, ny2], [nx3, ny3]];
+    for (const [nx, ny] of neighbors) {
       if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
-      const key = `${nx},${ny}`;
-      if (visited.has(key)) continue;
-
+      const idx = ny * GRID_SIZE + nx;
+      if (visited[idx]) continue;
       const neighbor = grid[ny][nx];
-      // 道路和校门可以传播连通性
       if (isRoadCell(neighbor) || neighbor.building === BuildingType.SCHOOL_GATE) {
-        visited.add(key);
+        visited[idx] = 1;
         neighbor.isConnectedToCampus = true;
         queue.push([nx, ny]);
       }
     }
   }
 
-  // 标记未连通的道路
+  // 标记未连通道路（合并到一次遍历中只查道路）
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
       const cell = grid[y][x];
