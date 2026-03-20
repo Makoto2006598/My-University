@@ -3,9 +3,8 @@ import React from 'react';
 import { CellData, BuildingType, ConstructionStatus, GRID_SIZE } from '../../types';
 import { Building3DBox, getTextureStyle } from './Visuals';
 import { BUILDINGS, VARIANTS } from '../../data/gameData';
-import { formatMoney } from '../../utils/gameUtils';
-import { checkRoadAdjacency } from '../../utils/gameUtils';
-import { Hammer } from 'lucide-react';
+import { formatMoney, checkConnectedRoadAdjacency } from '../../utils/gameUtils';
+import { Hammer, AlertTriangle } from 'lucide-react';
 
 interface GameViewportProps {
     grid: CellData[][]; // Only pass grid, not full GameState, for memoization
@@ -127,10 +126,14 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
             }
         }
 
-        // Road adjacency check
-        const needsRoad = ![BuildingType.PARK, BuildingType.FENCE, BuildingType.ROAD, BuildingType.CITY_ROAD].includes(tool);
-        if (needsRoad && tool !== BuildingType.SCHOOL_GATE && !checkRoadAdjacency(grid, x, y, w, h)) {
-            return { valid: false, reason: '需要连接道路' };
+        // Road connectivity check
+        const def = BUILDINGS[tool];
+        const needsRoad = def.requiresRoadConnection !== false && ![BuildingType.ROAD, BuildingType.CITY_ROAD].includes(tool);
+        if (needsRoad && tool !== BuildingType.SCHOOL_GATE) {
+            const roadCheck = checkConnectedRoadAdjacency(grid, x, y, w, h);
+            if (!roadCheck.valid) {
+                return { valid: false, reason: roadCheck.reason || '需要连接道路' };
+            }
         }
 
         return { valid: true };
@@ -162,25 +165,47 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
         const cost = variant?.cost || BUILDINGS[selectedTool].cost;
         const { valid, reason } = checkPlacementValid(hoveredCell.x, hoveredCell.y, width, height, selectedTool);
 
+        const def = BUILDINGS[selectedTool];
+        const serviceRadius = def.serviceRadius;
+        const serviceColors: Record<string, string> = {
+            food: 'border-orange-400/40 bg-orange-400/10',
+            study: 'border-blue-400/40 bg-blue-400/10',
+            recreation: 'border-green-400/40 bg-green-400/10'
+        };
+
         return (
-            <div className={`absolute border-2 pointer-events-none z-50 transition-all duration-75 flex flex-col items-center justify-center font-bold text-xs ${
-                valid
-                    ? 'border-emerald-400/70 bg-emerald-500/25'
-                    : 'border-red-400/70 bg-red-500/25'
-            }`}
-                style={{
-                    left: hoveredCell.x * CELL_SIZE_PX,
-                    top: hoveredCell.y * CELL_SIZE_PX,
-                    width: width * CELL_SIZE_PX,
-                    height: height * CELL_SIZE_PX,
-                    transform: `translateZ(1px)`
-                }}
-            >
-                <span className="text-white drop-shadow font-bold">{BUILDINGS[selectedTool].icon} {width}x{height}</span>
-                <span className={`text-[9px] font-mono drop-shadow mt-0.5 ${valid ? 'text-emerald-200' : 'text-red-200'}`}>
-                    {valid ? formatMoney(cost) : reason}
-                </span>
-            </div>
+            <>
+                {/* 服务半径预览圈 */}
+                {valid && serviceRadius && def.serviceType && (
+                    <div className={`absolute pointer-events-none z-40 rounded-full border-2 border-dashed ${serviceColors[def.serviceType] || ''}`}
+                        style={{
+                            left: (hoveredCell.x + width / 2) * CELL_SIZE_PX - serviceRadius * CELL_SIZE_PX,
+                            top: (hoveredCell.y + height / 2) * CELL_SIZE_PX - serviceRadius * CELL_SIZE_PX,
+                            width: serviceRadius * 2 * CELL_SIZE_PX,
+                            height: serviceRadius * 2 * CELL_SIZE_PX,
+                            transform: `translateZ(0.5px)`
+                        }}
+                    />
+                )}
+                <div className={`absolute border-2 pointer-events-none z-50 transition-all duration-75 flex flex-col items-center justify-center font-bold text-xs ${
+                    valid
+                        ? 'border-emerald-400/70 bg-emerald-500/25'
+                        : 'border-red-400/70 bg-red-500/25'
+                }`}
+                    style={{
+                        left: hoveredCell.x * CELL_SIZE_PX,
+                        top: hoveredCell.y * CELL_SIZE_PX,
+                        width: width * CELL_SIZE_PX,
+                        height: height * CELL_SIZE_PX,
+                        transform: `translateZ(1px)`
+                    }}
+                >
+                    <span className="text-white drop-shadow font-bold">{def.icon} {width}x{height}</span>
+                    <span className={`text-[9px] font-mono drop-shadow mt-0.5 ${valid ? 'text-emerald-200' : 'text-red-200'}`}>
+                        {valid ? formatMoney(cost) : reason}
+                    </span>
+                </div>
+            </>
         );
     };
 
@@ -306,6 +331,22 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                                 <div className="absolute inset-0" style={{transform: 'translateZ(0.5px)'}} />
                             )}
                             
+                            {/* 未连通道路警告 */}
+                            {cell.building === BuildingType.ROAD && cell.isConnectedToCampus === false && (
+                                <div className="absolute inset-0 z-10 flex items-center justify-center" style={{transform: 'translateZ(2px)'}}>
+                                    <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
+                                </div>
+                            )}
+
+                            {/* 服务覆盖可视化（选中有serviceRadius的建筑时显示） */}
+                            {cell.serviceCoverage && cell.building === BuildingType.NONE && (
+                                <div className={`absolute inset-0 pointer-events-none ${
+                                    cell.serviceCoverage.food ? 'bg-orange-400/8' :
+                                    cell.serviceCoverage.study ? 'bg-blue-400/8' :
+                                    cell.serviceCoverage.recreation ? 'bg-green-400/8' : ''
+                                }`}></div>
+                            )}
+
                             {/* Zone Highlight */}
                             {cell.isZoned && cell.building === BuildingType.NONE && <div className="absolute inset-0 bg-orange-500/10 border border-orange-500/20"></div>}
                         </div>

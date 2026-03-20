@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-    GameState, UniType1, UniType2, UniversityScale, UniversityRank, 
-    AdmissionsPhase, FinanceHistoryPoint, ConstructionStatus, 
+import {
+    GameState, UniType1, UniType2, UniversityScale, UniversityRank,
+    AdmissionsPhase, FinanceHistoryPoint, ConstructionStatus,
     BuildingType, CellData, BuildingDef, VariantDef,
     SocialPublicityTier, MinistryPublicityType, PublicityBuffType,
     ActiveCampaign, ActiveBuff, MissionStatus
@@ -10,9 +10,10 @@ import {
 import { 
     INITIAL_MONEY_PUBLIC, INITIAL_MONEY_PRIVATE, GRID_SIZE 
 } from '../../../types';
-import { 
-    createInitialGrid, getGameDate, calculateStats, generateId, 
-    checkRoadAdjacency, calculateZones, getThickLinePoints 
+import {
+    createInitialGrid, getGameDate, calculateStats, generateId,
+    calculateZones, getThickLinePoints, updateFullGrid,
+    checkConnectedRoadAdjacency
 } from '../../../utils/gameUtils';
 import { generateDailyStudents } from '../../../utils/studentSystem';
 import { SaveManager } from '../../../utils/saveManager';
@@ -138,15 +139,22 @@ export const useGameLogic = (
 
                 // Construction & Stats
                 const nextDay = prev.day + 1;
+                let anyCompleted = false;
                 const newGrid = prev.grid.map(row => row.map(cell => {
                     if (cell.constructionStatus === ConstructionStatus.CONSTRUCTING && cell.constructionLeft !== undefined) {
                         const newLeft = cell.constructionLeft - 1;
-                        return newLeft <= 0 
-                            ? { ...cell, constructionStatus: ConstructionStatus.COMPLETED, constructionLeft: 0 } 
-                            : { ...cell, constructionLeft: newLeft };
+                        if (newLeft <= 0) {
+                            anyCompleted = true;
+                            return { ...cell, constructionStatus: ConstructionStatus.COMPLETED, constructionLeft: 0 };
+                        }
+                        return { ...cell, constructionLeft: newLeft };
                     }
                     return cell;
                 }));
+                // 建筑完工时重新计算服务覆盖
+                if (anyCompleted) {
+                    updateFullGrid(newGrid);
+                }
 
                 const stats = calculateStats(newGrid, prev.students, prev.happiness, prev);
                 const netIncome = stats.netIncome - dailyPublicityCost + liaisonGrant;
@@ -229,9 +237,13 @@ export const useGameLogic = (
         if (gameState.money < cost) { alert("资金不足！"); return; }
         if (x + width > GRID_SIZE || y + height > GRID_SIZE) return;
 
-        const needsRoad = ![BuildingType.PARK, BuildingType.FENCE, BuildingType.ROAD, BuildingType.CITY_ROAD].includes(tool);
-        if (needsRoad && tool !== BuildingType.SCHOOL_GATE && !checkRoadAdjacency(gameState.grid, x, y, width, height)) {
-            alert("建筑必须连接道路！"); return;
+        const def = BUILDINGS[tool];
+        const needsRoad = def.requiresRoadConnection !== false && ![BuildingType.ROAD, BuildingType.CITY_ROAD].includes(tool);
+        if (needsRoad && tool !== BuildingType.SCHOOL_GATE) {
+            const roadCheck = checkConnectedRoadAdjacency(gameState.grid, x, y, width, height);
+            if (!roadCheck.valid) {
+                alert(roadCheck.reason || "建筑必须连接道路！"); return;
+            }
         }
 
         for(let dy=0; dy<height; dy++) for(let dx=0; dx<width; dx++) {
@@ -241,21 +253,23 @@ export const useGameLogic = (
         setGameState(prev => {
             const newGrid = prev.grid.map(row => row.map(c => ({...c})));
             const bid = generateId();
-            const def = BUILDINGS[tool];
+            const bDef = BUILDINGS[tool];
             for (let dy = 0; dy < height; dy++) {
                 for (let dx = 0; dx < width; dx++) {
-                    newGrid[y + dy][x + dx] = { 
-                        ...newGrid[y + dy][x + dx], 
-                        building: tool, 
-                        buildingId: bid, 
-                        variantId: variant?.id, 
-                        isOrigin: dx === 0 && dy === 0, 
-                        rotation: isRotated ? 1 : 0, 
-                        constructionStatus: def.constructionTime > 0 ? ConstructionStatus.CONSTRUCTING : ConstructionStatus.COMPLETED, 
-                        constructionLeft: def.constructionTime 
+                    newGrid[y + dy][x + dx] = {
+                        ...newGrid[y + dy][x + dx],
+                        building: tool,
+                        buildingId: bid,
+                        variantId: variant?.id,
+                        isOrigin: dx === 0 && dy === 0,
+                        rotation: isRotated ? 1 : 0,
+                        constructionStatus: bDef.constructionTime > 0 ? ConstructionStatus.CONSTRUCTING : ConstructionStatus.COMPLETED,
+                        constructionLeft: bDef.constructionTime
                     };
                 }
             }
+            // 更新路网拓扑和服务覆盖
+            updateFullGrid(newGrid);
             return { ...prev, money: prev.money - cost, grid: newGrid };
         });
     }, [gameState.money, gameState.grid]);
@@ -272,24 +286,28 @@ export const useGameLogic = (
             dragPath.forEach(pos => {
                 const current = newGrid[pos.y][pos.x];
                 if (current.building === BuildingType.NONE || current.building === BuildingType.FENCE) {
-                    newGrid[pos.y][pos.x] = { 
-                        x: pos.x, y: pos.y, 
-                        building: BuildingType.ROAD, 
-                        roadZoneDepth: 3, 
-                        isZoned: false, 
-                        variantId: variant?.id, 
-                        constructionStatus: ConstructionStatus.COMPLETED 
+                    newGrid[pos.y][pos.x] = {
+                        x: pos.x, y: pos.y,
+                        building: BuildingType.ROAD,
+                        roadZoneDepth: 3,
+                        isZoned: false,
+                        variantId: variant?.id,
+                        constructionStatus: ConstructionStatus.COMPLETED
                     };
                 }
             });
-            return { ...prev, money: prev.money - cost, grid: calculateZones(newGrid) };
+            // 新道路可能连通之前断开的路段，需要全局重算
+            updateFullGrid(newGrid);
+            return { ...prev, money: prev.money - cost, grid: newGrid };
         });
     }, [gameState.money]);
 
     const removeBuilding = useCallback((buildingId: string) => {
         setGameState(prev => {
-            const newGrid = prev.grid.map(row => row.map(c => c.buildingId === buildingId ? { x: c.x, y: c.y, building: BuildingType.NONE } : c));
-            return { ...prev, grid: calculateZones(newGrid) };
+            const newGrid = prev.grid.map(row => row.map(c => c.buildingId === buildingId ? { x: c.x, y: c.y, building: BuildingType.NONE } as CellData : {...c}));
+            // 删除道路可能导致其他道路/建筑断开连接
+            updateFullGrid(newGrid);
+            return { ...prev, grid: newGrid };
         });
     }, []);
 

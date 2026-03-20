@@ -61,6 +61,8 @@ export interface MajorDef {
   collegeType: CollegeType;
 }
 
+export type ServiceType = 'food' | 'study' | 'recreation';
+
 export interface BuildingDef {
   type: BuildingType;
   name: string;
@@ -73,9 +75,14 @@ export interface BuildingDef {
   color: string;
   icon: string;
   description?: string;
-  textureType?: 'asphalt' | 'paved' | 'grass' | 'floor' | 'brick' | 'glass' | 'concrete' | 'tech'; // Expanded textures
+  textureType?: 'asphalt' | 'paved' | 'grass' | 'floor' | 'brick' | 'glass' | 'concrete' | 'tech';
   width?: number;
   height?: number;
+  // Road network
+  requiresRoadConnection?: boolean; // 是否需要连通道路（默认true，PARK/FENCE除外）
+  // Service radius
+  serviceRadius?: number;    // 服务辐射半径（曼哈顿距离，格数）
+  serviceType?: ServiceType; // 服务类型
 }
 
 export interface VariantDef {
@@ -98,6 +105,30 @@ export enum ConstructionStatus {
   COMPLETED = 'COMPLETED'
 }
 
+// 道路连接方向
+export interface RoadConnections {
+  north: boolean;
+  south: boolean;
+  east: boolean;
+  west: boolean;
+}
+
+// 道路形态类型（根据相邻道路自动计算）
+export type RoadShape =
+  | 'straight_h' | 'straight_v'
+  | 'corner_ne' | 'corner_nw' | 'corner_se' | 'corner_sw'
+  | 't_north' | 't_south' | 't_east' | 't_west'
+  | 'cross'
+  | 'dead_end_n' | 'dead_end_s' | 'dead_end_e' | 'dead_end_w'
+  | 'isolated';
+
+// 服务覆盖类型
+export interface ServiceCoverage {
+  food?: boolean;       // 食堂覆盖
+  study?: boolean;      // 图书馆覆盖
+  recreation?: boolean; // 公园/休闲覆盖
+}
+
 export interface CellData {
   x: number;
   y: number;
@@ -105,13 +136,20 @@ export interface CellData {
   buildingId?: string;
   isOrigin?: boolean;
   variantId?: string;
-  // New Logic
+  // Construction
   constructionStatus?: ConstructionStatus;
-  constructionLeft?: number; // Ticks remaining
-  rotation?: number; // 0, 90 (affects dimensions logic in renderer)
+  constructionLeft?: number;
+  rotation?: number;
   customName?: string;
+  // Zone
   isZoned?: boolean;
   roadZoneDepth?: number;
+  // Road network topology
+  roadConnections?: RoadConnections;
+  roadShape?: RoadShape;
+  isConnectedToCampus?: boolean; // 是否连通到校门/城市道路
+  // Service radius
+  serviceCoverage?: ServiceCoverage;
 }
 
 // HR Types

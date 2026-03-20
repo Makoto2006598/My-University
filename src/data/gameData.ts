@@ -45,11 +45,11 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   [BuildingType.SCHOOL_GATE]: { type: BuildingType.SCHOOL_GATE, name: '校门', cost: 5000000, maintenance: 5000, constructionTime: 10, color: 'bg-orange-600', icon: '⛩️', description: '校园入口。', textureType: 'concrete' },
   [BuildingType.DORMITORY]: { type: BuildingType.DORMITORY, name: '学生宿舍', cost: 2000000, maintenance: 15000, capacity: 50, happiness: 5, constructionTime: 20, color: 'bg-amber-500', icon: '🏠', textureType: 'brick' },
   [BuildingType.LECTURE_HALL]: { type: BuildingType.LECTURE_HALL, name: '教学楼', cost: 8000000, maintenance: 30000, capacity: 100, happiness: -2, revenue: 1000, constructionTime: 40, color: 'bg-blue-600', icon: '📚', textureType: 'glass' },
-  [BuildingType.CAFETERIA]: { type: BuildingType.CAFETERIA, name: '食堂', cost: 3000000, maintenance: 20000, happiness: 15, revenue: 50000, constructionTime: 15, color: 'bg-rose-500', icon: '🍔', textureType: 'concrete' },
+  [BuildingType.CAFETERIA]: { type: BuildingType.CAFETERIA, name: '食堂', cost: 3000000, maintenance: 20000, happiness: 15, revenue: 50000, constructionTime: 15, color: 'bg-rose-500', icon: '🍔', textureType: 'concrete', serviceRadius: 12, serviceType: 'food' },
   [BuildingType.LABORATORY]: { type: BuildingType.LABORATORY, name: '科研实验楼', cost: 15000000, maintenance: 100000, capacity: 20, revenue: 30000, happiness: -5, constructionTime: 60, color: 'bg-purple-600', icon: '🔬', textureType: 'tech' },
-  [BuildingType.LIBRARY]: { type: BuildingType.LIBRARY, name: '图书馆', cost: 10000000, maintenance: 50000, happiness: 30, constructionTime: 45, color: 'bg-teal-600', icon: '🏛️', description: '标志性建筑。', textureType: 'glass' },
-  [BuildingType.PARK]: { type: BuildingType.PARK, name: '景观与绿化', cost: 500000, maintenance: 5000, happiness: 10, constructionTime: 5, color: 'bg-emerald-500', icon: '🌳', textureType: 'grass' },
-  [BuildingType.FENCE]: { type: BuildingType.FENCE, name: '围墙', cost: 1000, maintenance: 0, constructionTime: 0, color: 'bg-stone-800', icon: '', description: '校园边界。' },
+  [BuildingType.LIBRARY]: { type: BuildingType.LIBRARY, name: '图书馆', cost: 10000000, maintenance: 50000, happiness: 30, constructionTime: 45, color: 'bg-teal-600', icon: '🏛️', description: '标志性建筑。', textureType: 'glass', serviceRadius: 15, serviceType: 'study' },
+  [BuildingType.PARK]: { type: BuildingType.PARK, name: '景观与绿化', cost: 500000, maintenance: 5000, happiness: 10, constructionTime: 5, color: 'bg-emerald-500', icon: '🌳', textureType: 'grass', serviceRadius: 8, serviceType: 'recreation', requiresRoadConnection: false },
+  [BuildingType.FENCE]: { type: BuildingType.FENCE, name: '围墙', cost: 1000, maintenance: 0, constructionTime: 0, color: 'bg-stone-800', icon: '', description: '校园边界。', requiresRoadConnection: false },
   [BuildingType.CITY_ROAD]: { type: BuildingType.CITY_ROAD, name: '城市公路', cost: 0, maintenance: 0, constructionTime: 0, color: 'bg-stone-500', icon: '', description: '市政设施。', textureType: 'asphalt' },
 };
 

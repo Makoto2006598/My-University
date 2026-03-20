@@ -10,8 +10,9 @@ import {
     DollarSign, School, Save, Info, Settings, Play, FastForward, UserPlus, ArrowLeft, X
 } from 'lucide-react';
 import { COLLEGES_DEF, BUILDINGS, VARIANTS, generateName, MISSIONS_DEF } from '../../data/gameData';
-import { 
-    generateId, formatMoney, getGameDate, calculateStats, getThickLinePoints, createInitialGrid 
+import {
+    generateId, formatMoney, getGameDate, calculateStats, getThickLinePoints, createInitialGrid,
+    getBuildingServiceInfo, checkConnectedRoadAdjacency
 } from '../../utils/gameUtils';
 import { SaveManager } from '../../utils/saveManager';
 import { getDeviceType, DeviceType } from '../../utils/deviceDetect';
@@ -545,9 +546,23 @@ export const CampusPlanner: React.FC = () => {
             );
         })()}
 
-        <BuildingInspector 
-            selectedBuilding={selectedBuilding} renameValue={renameValue} onRenameChange={setRenameValue} 
-            onRenameSubmit={(n) => handlers.renameBuilding(selectedBuilding!.id, n)} onClose={() => setSelectedBuilding(null)} onRemove={handlers.removeBuilding} 
+        <BuildingInspector
+            selectedBuilding={selectedBuilding} renameValue={renameValue} onRenameChange={setRenameValue}
+            onRenameSubmit={(n) => handlers.renameBuilding(selectedBuilding!.id, n)} onClose={() => setSelectedBuilding(null)} onRemove={handlers.removeBuilding}
+            serviceCoverage={selectedBuilding?.cell.isOrigin ? getBuildingServiceInfo(gameState.grid, selectedBuilding.cell.x, selectedBuilding.cell.y) : undefined}
+            isConnected={selectedBuilding ? (() => {
+                const c = selectedBuilding.cell;
+                const def = BUILDINGS[c.building];
+                if (def.requiresRoadConnection === false) return true;
+                if (!c.isOrigin) return undefined;
+                const variants = VARIANTS[c.building];
+                const variant = variants?.find(v => v.id === c.variantId);
+                const bw = variant ? variant.width : (def.width || 1);
+                const bh = variant ? variant.height : (def.height || 1);
+                const w = c.rotation ? bh : bw;
+                const h = c.rotation ? bw : bh;
+                return checkConnectedRoadAdjacency(gameState.grid, c.x, c.y, w, h).valid;
+            })() : undefined}
         />
 
         {/* Modals Layer */}
