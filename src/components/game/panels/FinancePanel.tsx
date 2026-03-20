@@ -76,7 +76,7 @@ export const FinancePanel: React.FC<FinancePanelProps> = ({
     };
 
     return (
-        <div className="flex flex-col xl:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300 pb-4 h-full overflow-hidden p-6">
+        <div className="flex flex-col xl:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300 pb-4 min-h-full p-6">
             <div className="flex-1 flex flex-col gap-4 min-w-[300px] overflow-y-auto custom-scrollbar pr-2">
                 <div className="flex justify-between items-center"><div className="flex gap-2 p-1 bg-stone-100 rounded-lg border border-stone-200"><button onClick={() => setFinanceChartMode('OVERVIEW')} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${financeChartMode === 'OVERVIEW' ? 'bg-orange-500 text-white' : 'text-stone-500 hover:text-stone-800'}`}>总览</button><button onClick={() => setFinanceChartMode('EXPENSE_DETAIL')} className={`px-3 py-1 rounded text-xs font-medium transition-colors ${financeChartMode === 'EXPENSE_DETAIL' ? 'bg-orange-500 text-white' : 'text-stone-500 hover:text-stone-800'}`}>支出</button></div><div className="text-[10px] text-stone-400">财务周期: 30天</div></div>
                 <div className="bg-white border border-stone-200 rounded-xl p-4 min-h-[200px] shadow-sm">{financeChartMode === 'OVERVIEW' ? (<SimpleLineChart data={gameState.financeHistory} dataKeys={['income', 'expense', 'balance']} colors={['#10b981', '#ef4444', '#f59e0b']} height={180}/>) : (<SimpleLineChart data={gameState.financeHistory} dataKeys={['maintenance', 'cafeteriaSubsidy', 'researchCost', 'facultySalaries']} colors={['#64748b', '#ef4444', '#a855f7', '#3b82f6']} height={180}/>)}</div>
