@@ -412,6 +412,10 @@ export const CampusPlanner: React.FC = () => {
                   </div>
               </div>
           </div>
+          <SettingsModal
+              isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} appSettings={appSettings} setAppSettings={setAppSettings}
+              onReturnToMain={() => setAppPhase('MAIN_MENU')} onDevTimeJump={(e) => { e.preventDefault(); }} onDevMaxRank={(e) => { e.preventDefault(); }}
+          />
       </div>
   );
 
@@ -489,7 +493,11 @@ export const CampusPlanner: React.FC = () => {
         </div>
         
         <GameHUD 
-            activeSidebarTab={activeSidebarTab} setActiveSidebarTab={setActiveSidebarTab} isMenuExpanded={isMenuExpanded} setIsMenuExpanded={setIsMenuExpanded}
+            activeSidebarTab={activeSidebarTab} setActiveSidebarTab={(tab) => {
+                const budgetPending = gameDate.date === 1 && !gameState.budgetConfirmed && gameState.day > 1;
+                if (budgetPending && activeSidebarTab === 'FINANCE' && tab !== 'FINANCE') return;
+                setActiveSidebarTab(tab);
+            }} isMenuExpanded={isMenuExpanded} setIsMenuExpanded={setIsMenuExpanded}
             selectedTool={selectedTool} setSelectedTool={setSelectedTool} selectedVariantIndex={selectedVariantIndex} setSelectedVariantIndex={setSelectedVariantIndex}
             isRotated={isRotated} onToggleRotate={() => setIsRotated(p => !p)}
             is2DMode={is2DMode} onToggle2D={() => {
@@ -503,14 +511,20 @@ export const CampusPlanner: React.FC = () => {
             }}
         />
 
-        {activeSidebarTab && activeSidebarTab !== 'BUILD' && (
+        {activeSidebarTab && activeSidebarTab !== 'BUILD' && (() => {
+            const isBudgetBlocking = activeSidebarTab === 'FINANCE' && gameDate.date === 1 && !gameState.budgetConfirmed && gameState.day > 1;
+            return (
             <div className="absolute inset-0 top-14 sm:top-16 bottom-0 bg-orange-50/95 z-20 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center p-6 border-b border-orange-100 bg-white/50">
                     <h2 className="text-2xl font-bold text-stone-800 tracking-tight flex items-center gap-3">
-                        {/* Map localized name or default */}
                         {activeSidebarTab === 'OVERVIEW' ? '概况' : activeSidebarTab === 'FINANCE' ? '财务处' : activeSidebarTab === 'PUBLICITY' ? '宣传处' : activeSidebarTab === 'LIAISON' ? '教育部联络处' : activeSidebarTab}
+                        {isBudgetBlocking && <span className="text-sm font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">请先确认预算</span>}
                     </h2>
-                    <button onClick={() => setActiveSidebarTab(null)} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-stone-200 active:bg-stone-300 text-stone-400 hover:text-stone-600"><X className="w-6 h-6"/></button>
+                    <button
+                        onClick={() => { if (!isBudgetBlocking) setActiveSidebarTab(null); }}
+                        disabled={isBudgetBlocking}
+                        className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full ${isBudgetBlocking ? 'text-stone-300 cursor-not-allowed' : 'hover:bg-stone-200 active:bg-stone-300 text-stone-400 hover:text-stone-600'}`}
+                    ><X className="w-6 h-6"/></button>
                 </div>
                 <div className="flex-1 overflow-hidden relative">
                     {activeSidebarTab === 'FINANCE' && <FinancePanel gameState={gameState} setGameState={setGameState} currentStats={currentStats} lockedAllocations={lockedAllocations} setLockedAllocations={setLockedAllocations} onBudgetConfirmed={() => { handlers.handleSpeedChange(previousSpeed || 1); }} />}
@@ -522,7 +536,8 @@ export const CampusPlanner: React.FC = () => {
                     {activeSidebarTab === 'LIAISON' && <LiaisonPanel gameState={gameState} onAcceptMission={handlers.acceptMission} onClaimMission={handlers.claimMission} onCancelMission={handlers.cancelMission} />}
                 </div>
             </div>
-        )}
+            );
+        })()}
 
         <BuildingInspector 
             selectedBuilding={selectedBuilding} renameValue={renameValue} onRenameChange={setRenameValue} 

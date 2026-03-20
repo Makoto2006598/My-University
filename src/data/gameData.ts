@@ -1,5 +1,5 @@
 
-import { BuildingType, BuildingDef, VariantDef, CollegeType, CollegeDef, MajorDef, MissionDef } from '../types';
+import { BuildingType, BuildingDef, VariantDef, CollegeType, CollegeDef, MajorDef, MissionDef, UniversityRank } from '../types';
 
 export const SURNAMES = "李王张刘陈杨赵黄周吴徐孙胡朱高林何郭马罗梁宋郑谢韩唐冯于董萧程曹袁邓许傅沈曾彭吕苏卢蒋蔡贾丁魏薛叶阎余潘杜戴夏钟汪田任姜范方石姚谭廖邹熊金陆郝孔白崔康毛邱秦江史顾侯邵孟龙万段雷钱汤尹黎葛墨";
 export const NAMES = "明华国平文强志伟东海燕红军建平博文洋阳建华颖灵慧巧娜静敏刚勇军磊涛斌强巍帅秀英丽霞敏燕萍婷玉兰桂芳云杰柳新宇恩泽浩然子轩梓涵一诺依诺诗涵欣怡梓萱浩宇宇轩子墨雨泽";
@@ -15,18 +15,18 @@ export const generateName = (): string => {
 export const COLLEGES_DEF: Record<CollegeType, CollegeDef> = {
     [CollegeType.ARTS]: { type: CollegeType.ARTS, name: '文学院', category: 'BASE', description: '人文学科的基础。' },
     [CollegeType.SCIENCE]: { type: CollegeType.SCIENCE, name: '理学院', category: 'BASE', description: '自然科学的基础。' },
-    [CollegeType.MEDICINE]: { type: CollegeType.MEDICINE, name: '医学院', category: 'BASE', description: '培养医学人才。' },
-    [CollegeType.CS]: { type: CollegeType.CS, name: '计算机学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, description: '新工科核心。' },
-    [CollegeType.IC]: { type: CollegeType.IC, name: '集成电路学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, description: '高精尖科技。' },
-    [CollegeType.ROBOTICS]: { type: CollegeType.ROBOTICS, name: '机器人学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, description: '未来工业基础。' },
-    [CollegeType.CIVIL]: { type: CollegeType.CIVIL, name: '土木学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '传统基建。' },
-    [CollegeType.ARCH]: { type: CollegeType.ARCH, name: '建筑学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '建筑与设计。' },
-    [CollegeType.MECH]: { type: CollegeType.MECH, name: '机械学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '工业制造。' },
-    [CollegeType.ELEC]: { type: CollegeType.ELEC, name: '电气学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, description: '能源与动力。' },
-    [CollegeType.LANG]: { type: CollegeType.LANG, name: '外国语学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '国际交流。' },
-    [CollegeType.LAW]: { type: CollegeType.LAW, name: '法学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '法治社会基石。' },
-    [CollegeType.TRADE]: { type: CollegeType.TRADE, name: '贸易学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '国际商业。' },
-    [CollegeType.ECON]: { type: CollegeType.ECON, name: '经济学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, description: '经济理论。' },
+    [CollegeType.MEDICINE]: { type: CollegeType.MEDICINE, name: '医学院', category: 'BASE', requiredRank: UniversityRank.TIER_2, description: '培养医学人才。' },
+    [CollegeType.CS]: { type: CollegeType.CS, name: '计算机学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, requiredRank: UniversityRank.TIER_2, description: '新工科核心。' },
+    [CollegeType.IC]: { type: CollegeType.IC, name: '集成电路学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, requiredRank: UniversityRank.TIER_1, description: '高精尖科技。' },
+    [CollegeType.ROBOTICS]: { type: CollegeType.ROBOTICS, name: '机器人学院', category: 'NEW_ENG', dependency: CollegeType.SCIENCE, requiredRank: UniversityRank.TIER_1, description: '未来工业基础。' },
+    [CollegeType.CIVIL]: { type: CollegeType.CIVIL, name: '土木学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, requiredRank: UniversityRank.TIER_3, description: '传统基建。' },
+    [CollegeType.ARCH]: { type: CollegeType.ARCH, name: '建筑学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, requiredRank: UniversityRank.TIER_3, description: '建筑与设计。' },
+    [CollegeType.MECH]: { type: CollegeType.MECH, name: '机械学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, requiredRank: UniversityRank.TIER_3, description: '工业制造。' },
+    [CollegeType.ELEC]: { type: CollegeType.ELEC, name: '电气学院', category: 'TRAD_ENG', dependency: CollegeType.SCIENCE, requiredRank: UniversityRank.TIER_3, description: '能源与动力。' },
+    [CollegeType.LANG]: { type: CollegeType.LANG, name: '外国语学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, requiredRank: UniversityRank.TIER_3, description: '国际交流。' },
+    [CollegeType.LAW]: { type: CollegeType.LAW, name: '法学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, requiredRank: UniversityRank.TIER_2, description: '法治社会基石。' },
+    [CollegeType.TRADE]: { type: CollegeType.TRADE, name: '贸易学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, requiredRank: UniversityRank.TIER_3, description: '国际商业。' },
+    [CollegeType.ECON]: { type: CollegeType.ECON, name: '经济学院', category: 'LIB_ARTS', dependency: CollegeType.ARTS, requiredRank: UniversityRank.TIER_2, description: '经济理论。' },
 };
 
 export const MAJORS_DEF: MajorDef[] = [
