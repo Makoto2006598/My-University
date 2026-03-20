@@ -68,7 +68,7 @@ export const CampusPlanner: React.FC = () => {
   const [deviceType] = useState<DeviceType>(() => getDeviceType());
   const [viewState, setViewState] = useState(() => {
     const zoom = deviceType === 'phone' ? 0.4 : deviceType === 'pad' ? 0.5 : 0.6;
-    return { x: 0, y: 0, zoom };
+    return { x: 0, y: 0, zoom, pitch: 55, yaw: 0 };
   });
   
   // Interaction Refs
@@ -94,6 +94,7 @@ export const CampusPlanner: React.FC = () => {
   });
   
   // Modals & Events Flags
+  const [is2DMode, setIs2DMode] = useState(false);
   const [potentialHires, setPotentialHires] = useState<Faculty[]>([]);
   const [recruitmentOpen, setRecruitmentOpen] = useState(false); 
   const [recruitmentConfigOpen, setRecruitmentConfigOpen] = useState(false); 
@@ -184,9 +185,10 @@ export const CampusPlanner: React.FC = () => {
           if (keysPressed.current.size > 0 && appPhase === 'GAME') {
               setViewState(p => {
                   const s = (10 / p.zoom) * appSettings.cameraPanSensitivity;
+                  const r = (p.yaw * Math.PI) / 180;
                   const dx = (keysPressed.current.has('d') ? 1 : 0) - (keysPressed.current.has('a') ? 1 : 0);
                   const dy = (keysPressed.current.has('s') ? 1 : 0) - (keysPressed.current.has('w') ? 1 : 0);
-                  return { ...p, x: p.x + dx * s, y: p.y + dy * s };
+                  return { ...p, x: p.x + (dx * Math.cos(r) - dy * Math.sin(r)) * s, y: p.y + (dx * Math.sin(r) + dy * Math.cos(r)) * s };
               });
           }
           rafRef.current = requestAnimationFrame(updateLoop); 
@@ -233,17 +235,26 @@ export const CampusPlanner: React.FC = () => {
               inputRef.current.isPanning = true; inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY;
           }
       }
-      if (e.button === 1) { // Middle Click - pan
+      if (e.button === 1) { // Middle Click
           e.preventDefault();
-          inputRef.current.isPanning = true; inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY;
+          if (!is2DMode) {
+              inputRef.current.isRotating = true; inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY;
+          }
       }
   };
 
   const handleMapMouseMove = (e: React.MouseEvent) => {
+      if (inputRef.current.isRotating && !is2DMode) {
+          const dx = e.clientX - inputRef.current.panStartX; const dy = e.clientY - inputRef.current.panStartY;
+          setViewState(p => ({ ...p, yaw: p.yaw - dx * 0.5, pitch: Math.max(10, Math.min(85, p.pitch - dy * 0.5)) }));
+          inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY;
+          return;
+      }
       if (inputRef.current.isPanning) {
           const dx = e.clientX - inputRef.current.panStartX; const dy = e.clientY - inputRef.current.panStartY;
           const s = (1/viewState.zoom)*appSettings.cameraPanSensitivity;
-          setViewState(p => ({ ...p, x: p.x - dx * s, y: p.y - dy * s }));
+          const r = (viewState.yaw*Math.PI)/180;
+          setViewState(p => ({ ...p, x: p.x - (dx*Math.cos(r)+dy*Math.sin(r))*s, y: p.y - (dy*Math.cos(r)-dx*Math.sin(r))*s }));
           inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY;
       }
   };
@@ -317,10 +328,11 @@ export const CampusPlanner: React.FC = () => {
       if (t.moved) {
         t.isTouchPanning = true;
         const s = (1 / viewState.zoom) * appSettings.cameraPanSensitivity;
+        const r = (viewState.yaw * Math.PI) / 180;
         setViewState(p => ({
           ...p,
-          x: p.x - dx * s,
-          y: p.y - dy * s,
+          x: p.x - (dx * Math.cos(r) + dy * Math.sin(r)) * s,
+          y: p.y - (dy * Math.cos(r) - dx * Math.sin(r)) * s,
         }));
       }
       t.lastX = touch.clientX;
@@ -334,6 +346,8 @@ export const CampusPlanner: React.FC = () => {
       setViewState(p => ({
         ...p,
         zoom: Math.max(0.2, Math.min(2.0, t.initialZoom * scale)),
+        // Two-finger rotate (only in 3D mode)
+        ...(!is2DMode ? { yaw: t.initialYaw - (angle - t.initialPinchAngle) } : {}),
       }));
     }
   };
@@ -460,9 +474,10 @@ export const CampusPlanner: React.FC = () => {
         
         <div className="absolute inset-0 top-14 sm:top-16 pb-0 z-0">
             {/* Memoized GameViewport using grid prop for optimization */}
-            <GameViewport 
+            <GameViewport
                 grid={gameState.grid}
                 viewState={viewState}
+                is2DMode={is2DMode}
                 appSettings={appSettings}
                 onMouseDown={handleMapMouseDown} 
                 onMouseMove={handleMapMouseMove} 
@@ -491,6 +506,15 @@ export const CampusPlanner: React.FC = () => {
             selectedTool={selectedTool} setSelectedTool={setSelectedTool} selectedVariantIndex={selectedVariantIndex} setSelectedVariantIndex={setSelectedVariantIndex}
             isRotated={isRotated} onToggleRotate={() => setIsRotated(p => !p)}
             deviceType={deviceType}
+            is2DMode={is2DMode} onToggle2D={() => {
+                const newIs2D = !is2DMode;
+                setIs2DMode(newIs2D);
+                if (newIs2D) {
+                    setViewState(prev => ({ ...prev, pitch: 0, yaw: 0 }));
+                } else {
+                    setViewState(prev => ({ ...prev, pitch: 55 }));
+                }
+            }}
         />
 
         {activeSidebarTab && activeSidebarTab !== 'BUILD' && (() => {

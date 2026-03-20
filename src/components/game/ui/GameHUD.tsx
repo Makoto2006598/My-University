@@ -18,6 +18,8 @@ interface GameHUDProps {
     setSelectedTool: (tool: BuildingType) => void;
     selectedVariantIndex: number;
     setSelectedVariantIndex: (index: number) => void;
+    is2DMode: boolean;
+    onToggle2D: () => void;
     isRotated?: boolean;
     onToggleRotate?: () => void;
     deviceType?: DeviceType;
@@ -40,6 +42,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     isMenuExpanded, setIsMenuExpanded,
     selectedTool, setSelectedTool,
     selectedVariantIndex, setSelectedVariantIndex,
+    is2DMode, onToggle2D,
     isRotated, onToggleRotate,
     deviceType = 'pc'
 }) => {
@@ -194,6 +197,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                     ))}
                 </div>
             </div>
+
+            {/* 2D/3D Toggle Button */}
+            <button
+                onClick={onToggle2D}
+                className="absolute bottom-20 right-2 sm:right-4 z-50 w-11 h-11 sm:w-12 sm:h-12 bg-white/80 backdrop-blur border border-stone-200 rounded-full text-stone-600 hover:text-orange-600 hover:bg-orange-50 active:bg-orange-100 transition-colors shadow-lg flex items-center justify-center font-black text-xs group"
+                title="切换视图模式"
+            >
+                {is2DMode ? "3D" : "2D"}
+                <div className="absolute right-full mr-2 bg-stone-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap hidden sm:block">
+                    切换视图
+                </div>
+            </button>
 
             {/* Toggle Dock Button */}
             <button
