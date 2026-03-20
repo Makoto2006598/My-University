@@ -32,7 +32,7 @@ export const BuildingInspector: React.FC<BuildingInspectorProps> = ({
     const happiness = variant?.happiness ?? def.happiness;
 
     return (
-        <div className="absolute bottom-32 left-4 bg-white/95 backdrop-blur border border-orange-200 p-4 rounded-xl shadow-xl w-72 z-30 animate-in slide-in-from-left-4 fade-in">
+        <div className="absolute bottom-28 sm:bottom-32 left-2 right-2 sm:left-4 sm:right-auto bg-white/95 backdrop-blur border border-orange-200 p-3 sm:p-4 rounded-xl shadow-xl sm:w-72 z-30 animate-in slide-in-from-left-4 fade-in">
             <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl shadow-sm ${def.color} text-white`}>
@@ -46,7 +46,7 @@ export const BuildingInspector: React.FC<BuildingInspectorProps> = ({
                         <div className="text-[10px] text-stone-500">{variant?.label || def.name}</div>
                     </div>
                 </div>
-                <button onClick={onClose} className="text-stone-400 hover:text-stone-600"><X className="w-4 h-4"/></button>
+                <button onClick={onClose} className="text-stone-400 hover:text-stone-600 p-1 min-w-[36px] min-h-[36px] flex items-center justify-center"><X className="w-5 h-5"/></button>
             </div>
 
             {/* Construction Progress */}
@@ -103,7 +103,7 @@ export const BuildingInspector: React.FC<BuildingInspectorProps> = ({
 
                 <button
                     onClick={() => onRemove(selectedBuilding.id)}
-                    className="mt-4 w-full py-2 bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 rounded-lg flex items-center justify-center gap-2 transition-all"
+                    className="mt-4 w-full py-2.5 sm:py-2 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-500 border border-red-200 rounded-lg flex items-center justify-center gap-2 transition-all min-h-[44px]"
                 >
                     <Trash2 className="w-3 h-3"/> 拆除建筑
                 </button>

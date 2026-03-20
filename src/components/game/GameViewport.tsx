@@ -24,31 +24,30 @@ interface GameViewportProps {
     isRotated: boolean;
     selectedVariantIndex: number;
     onWheel: (e: React.WheelEvent) => void;
+    onTouchStart: (e: React.TouchEvent) => void;
+    onTouchMove: (e: React.TouchEvent) => void;
+    onTouchEnd: (e: React.TouchEvent) => void;
 }
 
 // Wrap in memo to prevent re-renders when money/students change, only when grid changes
 export const GameViewport: React.FC<GameViewportProps> = React.memo(({
     grid, viewState, is2DMode, appSettings,
     onMouseDown, onMouseMove, onMouseUp, onMouseLeave, onContextMenu,
-    hoveredCell, setHoveredCell, dragPath, selectedTool, isRotated, selectedVariantIndex, onWheel
+    hoveredCell, setHoveredCell, dragPath, selectedTool, isRotated, selectedVariantIndex, onWheel,
+    onTouchStart, onTouchMove, onTouchEnd
 }) => {
     const CELL_SIZE_PX = 37;
 
-    const handleMouseMove = (e: React.MouseEvent) => {
-        onMouseMove(e);
-
-        const rect = e.currentTarget.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-
+    // Shared hit-test: screen coords -> grid cell
+    const screenToGrid = (clientX: number, clientY: number, rect: DOMRect): { x: number, y: number } | null => {
+        const mx = clientX - rect.left;
+        const my = clientY - rect.top;
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
-
-        // Screen-relative coordinates
         const relX = mx - centerX;
         const relY = my - centerY;
 
-        const P = 2000; // perspective distance
+        const P = 2000;
         const zoom = viewState.zoom;
         const pitchRad = (viewState.pitch * Math.PI) / 180;
         const yawRad = (viewState.yaw * Math.PI) / 180;
@@ -57,32 +56,9 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
         const vx = viewState.x;
         const vy = viewState.y;
 
-        // Inverse projection: screen -> world ground plane (z=0)
-        // The CSS transform chain (applied to element point):
-        //   rotateZ(yaw) -> rotateX(pitch) -> scale(zoom) -> translate(-vx*zoom, -vy*zoom) -> perspective(P)
-        //
-        // For ground point (wx, wy, 0):
-        //   After rotateZ: rx = wx*cos(yaw) - wy*sin(yaw), ry = wx*sin(yaw) + wy*cos(yaw)
-        //   After rotateX: x' = rx, y' = ry*cos(pitch), z' = -ry*sin(pitch)
-        //   After scale:   x'' = x'*zoom, y'' = y'*zoom, z'' = z'*zoom
-        //   After translate: tx = x'' - vx*zoom, ty = y'' - vy*zoom, tz = z''
-        //   After perspective: sx = tx * P/(P - tz), sy = ty * P/(P - tz)
-        //
-        // Solve inverse: given sx=relX, sy=relY, find wx, wy
-
-        // Let B = ry*cosP - vy (intermediate after rotateX + translate, before zoom/perspective)
-        // tz = -ry*sinP*zoom, and ry = (B + vy)/cosP
-        // So tz = -(B + vy)*sinP/cosP * zoom = -(B+vy)*tanP*zoom
-        //
-        // sy = B*zoom * P / (P + (B+vy)*tanP*zoom)
-        // Solving for B:
         const tanP = sinP / (cosP || 0.0001);
         const denominator = zoom * P - relY * tanP * zoom;
-
-        if (Math.abs(denominator) < 0.001) {
-            setHoveredCell(null);
-            return;
-        }
+        if (Math.abs(denominator) < 0.001) return null;
 
         const B = (relY * (P + vy * tanP * zoom)) / denominator;
         const ry = (B + vy) / (cosP || 0.0001);
@@ -91,7 +67,6 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
         const A = relX / (zoom * D);
         const rx = A + vx;
 
-        // Inverse rotateZ
         const cosY = Math.cos(-yawRad);
         const sinY = Math.sin(-yawRad);
         const worldX = rx * cosY - ry * sinY;
@@ -101,11 +76,38 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
         const gridY = Math.floor((worldY + (GRID_SIZE * CELL_SIZE_PX) / 2) / CELL_SIZE_PX);
 
         if (gridX >= 0 && gridX < GRID_SIZE && gridY >= 0 && gridY < GRID_SIZE) {
-            if (!hoveredCell || hoveredCell.x !== gridX || hoveredCell.y !== gridY) {
-                setHoveredCell({ x: gridX, y: gridY });
+            return { x: gridX, y: gridY };
+        }
+        return null;
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        onMouseMove(e);
+        const rect = e.currentTarget.getBoundingClientRect();
+        const cell = screenToGrid(e.clientX, e.clientY, rect);
+        if (cell) {
+            if (!hoveredCell || hoveredCell.x !== cell.x || hoveredCell.y !== cell.y) {
+                setHoveredCell(cell);
             }
         } else {
             setHoveredCell(null);
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        onTouchMove(e);
+        // Update hovered cell from first touch point
+        if (e.touches.length === 1) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const touch = e.touches[0];
+            const cell = screenToGrid(touch.clientX, touch.clientY, rect);
+            if (cell) {
+                if (!hoveredCell || hoveredCell.x !== cell.x || hoveredCell.y !== cell.y) {
+                    setHoveredCell(cell);
+                }
+            } else {
+                setHoveredCell(null);
+            }
         }
     };
 
@@ -183,13 +185,26 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
     };
 
     return (
-        <div 
+        <div
             className="flex-1 relative overflow-hidden bg-sky-100 cursor-crosshair select-none perspective-1000 h-full w-full"
+            style={{ touchAction: 'none' }}
             onMouseDown={onMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseLeave}
             onWheel={onWheel}
+            onTouchStart={(e) => {
+                // Update hovered cell on touch start for single-finger taps
+                if (e.touches.length === 1) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const touch = e.touches[0];
+                    const cell = screenToGrid(touch.clientX, touch.clientY, rect);
+                    if (cell) setHoveredCell(cell);
+                }
+                onTouchStart(e);
+            }}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={onTouchEnd}
         >
             <div 
                 className="absolute inset-0 transform-style-3d origin-center will-change-transform transition-transform duration-75 ease-out"

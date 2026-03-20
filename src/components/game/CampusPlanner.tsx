@@ -69,6 +69,23 @@ export const CampusPlanner: React.FC = () => {
   const keysPressed = useRef<Set<string>>(new Set());
   const rafRef = useRef<number | null>(null);
   const inputRef = useRef({ isPanning: false, isRotating: false, panStartX: 0, panStartY: 0 });
+
+  // Touch Refs
+  const touchRef = useRef({
+    startTime: 0,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    isTouchPanning: false,
+    isPinching: false,
+    initialPinchDist: 0,
+    initialPinchAngle: 0,
+    initialZoom: 0.6,
+    initialYaw: 0,
+    longPressTimer: null as ReturnType<typeof setTimeout> | null,
+    moved: false,
+  });
   
   // Modals & Events Flags
   const [is2DMode, setIs2DMode] = useState(false);
@@ -251,6 +268,131 @@ export const CampusPlanner: React.FC = () => {
 
   const handleWheel = (e: React.WheelEvent) => setViewState(p => ({ ...p, zoom: Math.max(0.2, Math.min(2.0, p.zoom + e.deltaY * -0.001)) }));
 
+  // --- Touch Interaction ---
+  const getTouchDist = (t1: React.Touch, t2: React.Touch) => Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  const getTouchAngle = (t1: React.Touch, t2: React.Touch) => Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = touchRef.current;
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      t.startTime = Date.now();
+      t.startX = touch.clientX;
+      t.startY = touch.clientY;
+      t.lastX = touch.clientX;
+      t.lastY = touch.clientY;
+      t.moved = false;
+      t.isTouchPanning = false;
+      // Long press for context menu (delete building)
+      if (t.longPressTimer) clearTimeout(t.longPressTimer);
+      t.longPressTimer = setTimeout(() => {
+        if (!t.moved && hoveredCell) {
+          const cell = gameState.grid[hoveredCell.y][hoveredCell.x];
+          if (cell.buildingId) {
+            handlers.removeBuilding(cell.buildingId);
+          }
+        }
+      }, 600);
+    } else if (e.touches.length === 2) {
+      // Cancel single-finger actions
+      if (t.longPressTimer) { clearTimeout(t.longPressTimer); t.longPressTimer = null; }
+      t.isTouchPanning = false;
+      t.isPinching = true;
+      t.initialPinchDist = getTouchDist(e.touches[0], e.touches[1]);
+      t.initialPinchAngle = getTouchAngle(e.touches[0], e.touches[1]);
+      t.initialZoom = viewState.zoom;
+      t.initialYaw = viewState.yaw;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const t = touchRef.current;
+    if (e.touches.length === 1 && !t.isPinching) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - t.lastX;
+      const dy = touch.clientY - t.lastY;
+      const totalDx = touch.clientX - t.startX;
+      const totalDy = touch.clientY - t.startY;
+
+      if (Math.abs(totalDx) > 8 || Math.abs(totalDy) > 8) {
+        t.moved = true;
+        if (t.longPressTimer) { clearTimeout(t.longPressTimer); t.longPressTimer = null; }
+      }
+
+      if (t.moved) {
+        t.isTouchPanning = true;
+        // Single-finger pan (same logic as mouse pan)
+        const s = (1 / viewState.zoom) * appSettings.cameraPanSensitivity;
+        const r = (viewState.yaw * Math.PI) / 180;
+        setViewState(p => ({
+          ...p,
+          x: p.x - (dx * Math.cos(r) + dy * Math.sin(r)) * s,
+          y: p.y - (dy * Math.cos(r) - dx * Math.sin(r)) * s,
+        }));
+      }
+      t.lastX = touch.clientX;
+      t.lastY = touch.clientY;
+    } else if (e.touches.length === 2 && t.isPinching) {
+      const dist = getTouchDist(e.touches[0], e.touches[1]);
+      const angle = getTouchAngle(e.touches[0], e.touches[1]);
+
+      // Pinch zoom
+      const scale = dist / t.initialPinchDist;
+      setViewState(p => ({
+        ...p,
+        zoom: Math.max(0.2, Math.min(2.0, t.initialZoom * scale)),
+        // Two-finger rotate (only in 3D mode)
+        ...(!is2DMode ? { yaw: t.initialYaw - (angle - t.initialPinchAngle) } : {}),
+      }));
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const t = touchRef.current;
+    if (t.longPressTimer) { clearTimeout(t.longPressTimer); t.longPressTimer = null; }
+
+    if (e.touches.length === 0) {
+      // All fingers lifted
+      if (t.isPinching) {
+        t.isPinching = false;
+        return;
+      }
+
+      // Was it a tap? (short duration, no movement)
+      const elapsed = Date.now() - t.startTime;
+      if (!t.moved && elapsed < 300) {
+        // Tap = click
+        if (selectedTool !== BuildingType.NONE && hoveredCell) {
+          if (selectedTool === BuildingType.ROAD) {
+            // For road, just place single cell on tap
+            handlers.commitRoad([{ x: hoveredCell.x, y: hoveredCell.y }], selectedTool, selectedVariantIndex);
+          } else {
+            handlers.placeBuilding(hoveredCell.x, hoveredCell.y, selectedTool, selectedVariantIndex, isRotated);
+          }
+        } else if (hoveredCell) {
+          const cell = gameState.grid[hoveredCell.y][hoveredCell.x];
+          if (cell.building !== BuildingType.NONE && cell.building !== BuildingType.ROAD && cell.building !== BuildingType.CITY_ROAD) {
+            const variant = VARIANTS[cell.building]?.find(v => v.id === cell.variantId);
+            setSelectedBuilding({ id: cell.buildingId || "", def: BUILDINGS[cell.building], variant, cell });
+            setRenameValue(cell.customName || BUILDINGS[cell.building].name);
+          } else {
+            setSelectedBuilding(null);
+          }
+        }
+      }
+
+      t.isTouchPanning = false;
+      t.moved = false;
+    } else if (e.touches.length === 1) {
+      // Went from 2 fingers to 1: reset single-finger tracking
+      t.isPinching = false;
+      const touch = e.touches[0];
+      t.lastX = touch.clientX;
+      t.lastY = touch.clientY;
+      t.moved = true; // prevent tap on lift
+    }
+  };
+
   // --- Render Views ---
 
   if (appPhase === 'MAIN_MENU') return (
@@ -340,12 +482,16 @@ export const CampusPlanner: React.FC = () => {
                 isRotated={isRotated} 
                 selectedVariantIndex={selectedVariantIndex} 
                 onWheel={handleWheel}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
             />
         </div>
         
         <GameHUD 
             activeSidebarTab={activeSidebarTab} setActiveSidebarTab={setActiveSidebarTab} isMenuExpanded={isMenuExpanded} setIsMenuExpanded={setIsMenuExpanded}
             selectedTool={selectedTool} setSelectedTool={setSelectedTool} selectedVariantIndex={selectedVariantIndex} setSelectedVariantIndex={setSelectedVariantIndex}
+            isRotated={isRotated} onToggleRotate={() => setIsRotated(p => !p)}
             is2DMode={is2DMode} onToggle2D={() => {
                 const newIs2D = !is2DMode;
                 setIs2DMode(newIs2D);
