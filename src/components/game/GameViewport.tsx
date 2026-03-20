@@ -1,15 +1,14 @@
 
 import React from 'react';
 import { CellData, BuildingType, ConstructionStatus, GRID_SIZE } from '../../types';
-import { Building3DBox, getTextureStyle } from './Visuals';
+import { getTextureStyle } from './Visuals';
 import { BUILDINGS, VARIANTS } from '../../data/gameData';
 import { formatMoney, checkConnectedRoadAdjacency } from '../../utils/gameUtils';
 import { Hammer, AlertTriangle } from 'lucide-react';
 
 interface GameViewportProps {
-    grid: CellData[][]; // Only pass grid, not full GameState, for memoization
-    viewState: { x: number, y: number, zoom: number, pitch: number, yaw: number };
-    is2DMode: boolean;
+    grid: CellData[][];
+    viewState: { x: number, y: number, zoom: number };
     appSettings: any;
     onMouseDown: (e: React.MouseEvent) => void;
     onMouseMove: (e: React.MouseEvent) => void;
@@ -30,46 +29,22 @@ interface GameViewportProps {
 
 // Wrap in memo to prevent re-renders when money/students change, only when grid changes
 export const GameViewport: React.FC<GameViewportProps> = React.memo(({
-    grid, viewState, is2DMode, appSettings,
+    grid, viewState, appSettings,
     onMouseDown, onMouseMove, onMouseUp, onMouseLeave, onContextMenu,
     hoveredCell, setHoveredCell, dragPath, selectedTool, isRotated, selectedVariantIndex, onWheel,
     onTouchStart, onTouchMove, onTouchEnd
 }) => {
     const CELL_SIZE_PX = 37;
 
-    // Shared hit-test: screen coords -> grid cell
+    // Shared hit-test: screen coords -> grid cell (2D only)
     const screenToGrid = (clientX: number, clientY: number, rect: DOMRect): { x: number, y: number } | null => {
         const mx = clientX - rect.left;
         const my = clientY - rect.top;
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
-        const relX = mx - centerX;
-        const relY = my - centerY;
 
-        const P = 2000;
-        const zoom = viewState.zoom;
-        const pitchRad = (viewState.pitch * Math.PI) / 180;
-        const yawRad = (viewState.yaw * Math.PI) / 180;
-        const cosP = Math.cos(pitchRad);
-        const sinP = Math.sin(pitchRad);
-        const vx = viewState.x;
-        const vy = viewState.y;
-
-        const tanP = sinP / (cosP || 0.0001);
-        const denominator = zoom * P - relY * tanP * zoom;
-        if (Math.abs(denominator) < 0.001) return null;
-
-        const B = (relY * (P + vy * tanP * zoom)) / denominator;
-        const ry = (B + vy) / (cosP || 0.0001);
-        const tz = -(B + vy) * tanP * zoom;
-        const D = P / (P - tz);
-        const A = relX / (zoom * D);
-        const rx = A + vx;
-
-        const cosY = Math.cos(-yawRad);
-        const sinY = Math.sin(-yawRad);
-        const worldX = rx * cosY - ry * sinY;
-        const worldY = rx * sinY + ry * cosY;
+        const worldX = (mx - centerX) / viewState.zoom + viewState.x;
+        const worldY = (my - centerY) / viewState.zoom + viewState.y;
 
         const gridX = Math.floor((worldX + (GRID_SIZE * CELL_SIZE_PX) / 2) / CELL_SIZE_PX);
         const gridY = Math.floor((worldY + (GRID_SIZE * CELL_SIZE_PX) / 2) / CELL_SIZE_PX);
@@ -183,7 +158,6 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                             top: (hoveredCell.y + height / 2) * CELL_SIZE_PX - serviceRadius * CELL_SIZE_PX,
                             width: serviceRadius * 2 * CELL_SIZE_PX,
                             height: serviceRadius * 2 * CELL_SIZE_PX,
-                            transform: `translateZ(0.5px)`
                         }}
                     />
                 )}
@@ -197,7 +171,6 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                         top: hoveredCell.y * CELL_SIZE_PX,
                         width: width * CELL_SIZE_PX,
                         height: height * CELL_SIZE_PX,
-                        transform: `translateZ(1px)`
                     }}
                 >
                     <span className="text-white drop-shadow font-bold">{def.icon} {width}x{height}</span>
@@ -211,7 +184,7 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
 
     return (
         <div
-            className="flex-1 relative overflow-hidden bg-sky-100 cursor-crosshair select-none perspective-1000 h-full w-full"
+            className="flex-1 relative overflow-hidden bg-sky-100 cursor-crosshair select-none h-full w-full"
             style={{ touchAction: 'none' }}
             onMouseDown={onMouseDown}
             onMouseMove={handleMouseMove}
@@ -219,7 +192,6 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
             onMouseLeave={onMouseLeave}
             onWheel={onWheel}
             onTouchStart={(e) => {
-                // Update hovered cell on touch start for single-finger taps
                 if (e.touches.length === 1) {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const touch = e.touches[0];
@@ -231,22 +203,19 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
             onTouchMove={handleTouchMove}
             onTouchEnd={onTouchEnd}
         >
-            <div 
-                className="absolute inset-0 transform-style-3d origin-center will-change-transform transition-transform duration-75 ease-out"
+            <div
+                className="absolute inset-0 origin-center will-change-transform transition-transform duration-75 ease-out"
                 style={{
                     transform: `
-                        perspective(2000px)
                         translateX(${ -viewState.x * viewState.zoom }px)
                         translateY(${ -viewState.y * viewState.zoom }px)
                         scale(${viewState.zoom})
-                        rotateX(${viewState.pitch}deg)
-                        rotateZ(${viewState.yaw}deg)
                     `
                 }}
             >
-                {/* The Map Plane (Ground) */}
-                <div 
-                    className="absolute bg-[#e6efc5] shadow-2xl transform-style-3d"
+                {/* Ground Plane */}
+                <div
+                    className="absolute bg-[#e6efc5] shadow-2xl"
                     style={{
                         width: GRID_SIZE * CELL_SIZE_PX,
                         height: GRID_SIZE * CELL_SIZE_PX,
@@ -261,7 +230,7 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                 >
                     {/* Render Cells */}
                     {grid.map((row, y) => row.map((cell, x) => (
-                        <div 
+                        <div
                             key={`${x}-${y}`}
                             className={`absolute transition-colors duration-200 ${
                                 hoveredCell?.x === x && hoveredCell?.y === y ? 'bg-white/30' : ''
@@ -274,14 +243,12 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                                 width: CELL_SIZE_PX,
                                 height: CELL_SIZE_PX,
                                 ...getTextureStyle(cell),
-                                transformStyle: 'preserve-3d',
-                                backfaceVisibility: 'hidden',
                             }}
                             onContextMenu={(e) => onContextMenu(e, x, y)}
                         >
                             {/* Construction Overlay */}
                             {cell.constructionStatus === ConstructionStatus.CONSTRUCTING && (
-                                <div className="absolute inset-0 z-10 bg-orange-100/80 border border-yellow-500/50 overflow-hidden" style={{transform: 'translateZ(1px)'}}>
+                                <div className="absolute inset-0 z-10 bg-orange-100/80 border border-yellow-500/50 overflow-hidden">
                                     <div className="absolute inset-0 opacity-20" style={{backgroundImage: 'repeating-linear-gradient(45deg, #fbbf24 0, #fbbf24 5px, transparent 5px, transparent 10px)'}}></div>
                                     <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-800 text-[10px] font-bold">
                                         <Hammer className="w-6 h-6 text-orange-500 animate-bounce mb-1" />
@@ -290,31 +257,8 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                                 </div>
                             )}
 
-                            {/* Render Building 3D Object if exists (only in 3D mode) */}
-                            {!is2DMode && cell.building !== BuildingType.NONE && cell.building !== BuildingType.ROAD && cell.building !== BuildingType.CITY_ROAD && cell.building !== BuildingType.FENCE && cell.isOrigin && (
-                                <Building3DBox
-                                    width={
-                                        (cell.rotation ? (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.height || 1) : (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.width || 1)) * CELL_SIZE_PX
-                                    }
-                                    depth={
-                                        (cell.rotation ? (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.width || 1) : (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.height || 1)) * CELL_SIZE_PX
-                                    }
-                                    height={
-                                        cell.constructionStatus === ConstructionStatus.CONSTRUCTING
-                                        ? 10
-                                        : 40
-                                    }
-                                    colorClass={
-                                        cell.constructionStatus === ConstructionStatus.CONSTRUCTING
-                                        ? 'bg-yellow-500/50'
-                                        : BUILDINGS[cell.building].color
-                                    }
-                                    textureStyle={getTextureStyle(cell)}
-                                    cell={cell}
-                                />
-                            )}
-                            {/* 2D mode: flat building label */}
-                            {is2DMode && cell.building !== BuildingType.NONE && cell.building !== BuildingType.ROAD && cell.building !== BuildingType.CITY_ROAD && cell.building !== BuildingType.FENCE && cell.isOrigin && (
+                            {/* 2D Building Label */}
+                            {cell.building !== BuildingType.NONE && cell.building !== BuildingType.ROAD && cell.building !== BuildingType.CITY_ROAD && cell.building !== BuildingType.FENCE && cell.isOrigin && (
                                 <div className={`absolute ${BUILDINGS[cell.building].color} border border-white/30 flex items-center justify-center pointer-events-none z-10`}
                                     style={{
                                         width: (cell.rotation ? (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.height || 1) : (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.width || 1)) * CELL_SIZE_PX,
@@ -326,19 +270,15 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                                     </span>
                                 </div>
                             )}
-                            {/* Flat Elements */}
-                            {(cell.building === BuildingType.ROAD || cell.building === BuildingType.CITY_ROAD || cell.building === BuildingType.PARK || cell.building === BuildingType.FENCE) && (
-                                <div className="absolute inset-0" style={{transform: 'translateZ(0.5px)'}} />
-                            )}
-                            
+
                             {/* 未连通道路警告 */}
                             {cell.building === BuildingType.ROAD && cell.isConnectedToCampus === false && (
-                                <div className="absolute inset-0 z-10 flex items-center justify-center" style={{transform: 'translateZ(2px)'}}>
+                                <div className="absolute inset-0 z-10 flex items-center justify-center">
                                     <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
                                 </div>
                             )}
 
-                            {/* 服务覆盖可视化（选中有serviceRadius的建筑时显示） */}
+                            {/* 服务覆盖可视化 */}
                             {cell.serviceCoverage && cell.building === BuildingType.NONE && (
                                 <div className={`absolute inset-0 pointer-events-none ${
                                     cell.serviceCoverage.food ? 'bg-orange-400/8' :
@@ -354,14 +294,6 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
 
                     {/* Ghost Building for Placement */}
                     {renderGhost()}
-                </div>
-            </div>
-            
-            {/* Compass / Orientation Indicator */}
-            <div className="absolute top-4 right-4 bg-white/80 backdrop-blur p-2 rounded-full border border-orange-200 pointer-events-none shadow-md">
-                <div className="w-8 h-8 rounded-full border-2 border-orange-400 relative flex items-center justify-center" style={{ transform: `rotate(${-viewState.yaw}deg)` }}>
-                    <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[8px] border-b-red-500 absolute -top-1"></div>
-                    <div className="text-[8px] font-bold text-stone-600">N</div>
                 </div>
             </div>
         </div>
