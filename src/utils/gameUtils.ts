@@ -1,11 +1,13 @@
 
-import { 
-    GameState, CellData, BuildingType, BuildingDef, VariantDef, 
+import {
+    GameState, CellData, BuildingType, BuildingDef, VariantDef,
     ActiveCollege, CollegeType, Faculty, UniversityScale, UniversityRank,
-    Student, Gender, UniType1, GRID_SIZE, ConstructionStatus 
+    Student, Gender, UniType1, GRID_SIZE, ConstructionStatus
 } from '../types';
 import { BUILDINGS, VARIANTS, generateName } from '../data/gameData';
 import { Snowflake, Leaf, Sun, CloudRain } from 'lucide-react';
+import { updateRoadNetwork, checkConnectedRoadAdjacency } from './roadNetwork';
+import { calculateServiceCoverage, getBuildingServiceInfo } from './serviceRadius';
 
 export const generateId = () => Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
 
@@ -17,7 +19,7 @@ export const formatMoney = (amount: number): string => {
 };
 
 export const createInitialGrid = (): CellData[][] => {
-  return Array(GRID_SIZE).fill(null).map((_, y) => 
+  const grid = Array(GRID_SIZE).fill(null).map((_, y) =>
     Array(GRID_SIZE).fill(null).map((_, x) => {
       let building = BuildingType.NONE;
       const isOuterRim = x === 0 || x === GRID_SIZE - 1 || y === 0 || y === GRID_SIZE - 1;
@@ -25,9 +27,13 @@ export const createInitialGrid = (): CellData[][] => {
         if ((x > GRID_SIZE/2 - 5 && x < GRID_SIZE/2 + 5) || (y > GRID_SIZE/2 - 5 && y < GRID_SIZE/2 + 5) || Math.random() > 0.4) building = BuildingType.CITY_ROAD;
       }
       const status = building === BuildingType.CITY_ROAD ? ConstructionStatus.COMPLETED : undefined;
-      return { x, y, building, constructionStatus: status };
+      return { x, y, building, constructionStatus: status } as CellData;
     })
   );
+  // 初始化路网拓扑
+  updateRoadNetwork(grid);
+  calculateZones(grid);
+  return grid;
 };
 
 const GAME_START_TIMESTAMP = new Date('2026-02-01T00:00:00Z').getTime();
@@ -145,8 +151,10 @@ export const getDeanManagementAbility = (collegeType: CollegeType, colleges: Act
 
 export const calculateStats = (grid: CellData[][], currentStudents: number, currentHappiness: number, gameState: GameState) => {
     let maintenanceRequiredMonthly = 0, buildingRevenueMonthly = 0, capacity = 0, happyPoints = 0, buildingCount = 0, hasGate = false, labCount = 0, lectureHallCount = 0, libraryCount = 0;
+    let disconnectedCount = 0; // 未连通道路的建筑数
+    let serviceCoverageBonus = 0; // 服务覆盖带来的幸福度加成
     const currentDate = getGameDate(gameState.day);
-    
+
     // Prep period: 2026-02-01 to 2027-09-01
     const prepEndDate = new Date('2027-09-01T00:00:00Z').getTime();
     const currentGameDateObj = new Date(GAME_START_TIMESTAMP + (gameState.day - 1) * MILLISECONDS_PER_DAY);
@@ -157,31 +165,62 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
       if (cell.building === BuildingType.SCHOOL_GATE) hasGate = true;
       const isFunctional = cell.constructionStatus === ConstructionStatus.COMPLETED || cell.building === BuildingType.CITY_ROAD || cell.building === BuildingType.ROAD;
       if (!isFunctional) return;
-      
+
       let stats: VariantDef | BuildingDef | null = null;
       if (cell.buildingId) {
          if (cell.isOrigin) {
              const variants = VARIANTS[cell.building];
              if (variants && cell.variantId) stats = variants.find(v => v.id === cell.variantId) || null;
              if (!stats) stats = BUILDINGS[cell.building];
-             
+
+             // 检查道路连通性：未连通建筑不计入容量和收入
+             const def = BUILDINGS[cell.building];
+             const needsRoad = def.requiresRoadConnection !== false;
+             const isConnected = !needsRoad || checkConnectedRoadAdjacency(grid, cell.x, cell.y,
+               (() => { const v = variants?.find(v2 => v2.id === cell.variantId); const w = v ? v.width : (def.width || 1); const h = v ? v.height : (def.height || 1); return cell.rotation ? h : w; })(),
+               (() => { const v = variants?.find(v2 => v2.id === cell.variantId); const w = v ? v.width : (def.width || 1); const h = v ? v.height : (def.height || 1); return cell.rotation ? w : h; })()
+             ).valid;
+
              // Count logic
              if (cell.building !== BuildingType.ROAD && cell.building !== BuildingType.CITY_ROAD && cell.building !== BuildingType.PARK) {
                  buildingCount++;
+                 if (!isConnected) disconnectedCount++;
              }
              if (cell.building === BuildingType.LABORATORY) labCount++;
              if (cell.building === BuildingType.LECTURE_HALL) lectureHallCount++;
              if (cell.building === BuildingType.LIBRARY) libraryCount++;
+
+             // 服务覆盖对有capacity建筑的加成
+             if (isConnected && stats && cell.constructionStatus === ConstructionStatus.COMPLETED) {
+               const svc = getBuildingServiceInfo(grid, cell.x, cell.y);
+               if (cell.building === BuildingType.DORMITORY) {
+                 if (svc.food) serviceCoverageBonus += 5;
+                 if (svc.study) serviceCoverageBonus += 3;
+                 if (svc.recreation) serviceCoverageBonus += 3;
+                 if (!svc.food && !svc.study && !svc.recreation) serviceCoverageBonus -= 8;
+               }
+               if (cell.building === BuildingType.LECTURE_HALL) {
+                 if (svc.food) serviceCoverageBonus += 2;
+                 if (svc.recreation) serviceCoverageBonus += 1;
+               }
+             }
+
+             // 未连通建筑不贡献容量和收入
+             if (isConnected && stats) {
+               capacity += (stats.capacity || 0);
+               buildingRevenueMonthly += (stats.revenue || 0);
+             }
          }
       } else {
-         // Should mostly be reached by roads/city roads/fences
          stats = BUILDINGS[cell.building];
       }
-      
+
       if (stats) {
          maintenanceRequiredMonthly += stats.maintenance;
-         buildingRevenueMonthly += (stats.revenue || 0);
-         capacity += (stats.capacity || 0);
+         if (!cell.buildingId) {
+           // 道路等无buildingId的直接加收入
+           buildingRevenueMonthly += (stats.revenue || 0);
+         }
          happyPoints += (stats.happiness || 0);
       }
     }));
@@ -230,8 +269,20 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
     let envHappiness = buildingCount > 0 ? (happyPoints / buildingCount) : 0;
     if (envHappiness > 0) happinessFactors.push({ label: '校园环境', value: Math.round(envHappiness), type: 'positive' });
 
+    // 服务覆盖加成
+    let svcBonus = buildingCount > 0 ? serviceCoverageBonus / buildingCount : 0;
+    if (svcBonus > 0) happinessFactors.push({ label: '设施覆盖', value: Math.round(svcBonus), type: 'positive' });
+    if (svcBonus < 0) happinessFactors.push({ label: '缺乏配套', value: Math.round(svcBonus), type: 'negative' });
+
+    // 道路断连惩罚
+    if (disconnectedCount > 0) {
+      const penalty = -Math.min(15, disconnectedCount * 3);
+      happinessFactors.push({ label: '建筑未连通', value: penalty, type: 'negative' });
+      envHappiness += penalty;
+    }
+
     // Student Factors
-    let sHapp = 50 + envHappiness;
+    let sHapp = 50 + envHappiness + svcBonus;
     if (fs.tuitionFeePerYear > 20) { const penalty = (fs.tuitionFeePerYear - 20) * 0.5; sHapp -= penalty; }
     if (maintenanceRatio < 0.8) { sHapp -= 10; }
     if (cafeteriaAllocated > currentStudents * 5) { sHapp += 5; }
@@ -239,9 +290,8 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
     studentSatisfaction = Math.min(100, Math.max(0, sHapp));
 
     // Faculty Factors
-    let fHapp = 50 + envHappiness;
+    let fHapp = 50 + envHappiness + svcBonus;
     if (maintenanceRatio < 0.8) { fHapp -= 5; }
-    // Salary comparison could go here
     facultySatisfaction = Math.min(100, Math.max(0, fHapp));
 
     let avgHappiness = (studentSatisfaction * (currentStudents || 1) + facultySatisfaction * (gameState.faculty.length || 1)) / ((currentStudents || 1) + (gameState.faculty.length || 1));
@@ -262,19 +312,10 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
     };
 };
 
+/** @deprecated 使用 checkConnectedRoadAdjacency 代替 */
 export const checkRoadAdjacency = (grid: CellData[][], x: number, y: number, width: number, height: number): boolean => {
-    const footprint: {x:number, y:number}[] = [];
-    for(let dy=0; dy<height; dy++) for(let dx=0; dx<width; dx++) footprint.push({x: x+dx, y: y+dy});
-    for(const cell of footprint) {
-        const neighbors = [{nx: cell.x, ny: cell.y-1}, {nx: cell.x, ny: cell.y+1}, {nx: cell.x-1, ny: cell.y}, {nx: cell.x+1, ny: cell.y}];
-        for(const n of neighbors) {
-            if(n.nx >= 0 && n.nx < GRID_SIZE && n.ny >= 0 && n.ny < GRID_SIZE) {
-                const neighborCell = grid[n.ny][n.nx];
-                if (neighborCell.building === BuildingType.ROAD || neighborCell.building === BuildingType.CITY_ROAD || neighborCell.building === BuildingType.SCHOOL_GATE) return true;
-            }
-        }
-    }
-    return false;
+    const result = checkConnectedRoadAdjacency(grid, x, y, width, height);
+    return result.valid;
 };
 
 export const calculateZones = (grid: CellData[][]): CellData[][] => {
@@ -283,7 +324,10 @@ export const calculateZones = (grid: CellData[][]): CellData[][] => {
     for(let y=0; y<GRID_SIZE; y++) {
         for(let x=0; x<GRID_SIZE; x++) {
             const cell = grid[y][x];
-            if (cell.building === BuildingType.ROAD || cell.building === BuildingType.CITY_ROAD || cell.building === BuildingType.SCHOOL_GATE) {
+            // 只有连通到校园的道路才产生可建区域
+            const isValidRoad = (cell.building === BuildingType.ROAD || cell.building === BuildingType.CITY_ROAD || cell.building === BuildingType.SCHOOL_GATE)
+                                && cell.isConnectedToCampus !== false;
+            if (isValidRoad) {
                 for(let dy=-zoneRadius; dy<=zoneRadius; dy++) {
                     for(let dx=-zoneRadius; dx<=zoneRadius; dx++) {
                         const ny = y + dy, nx = x + dx;
@@ -295,6 +339,20 @@ export const calculateZones = (grid: CellData[][]): CellData[][] => {
     }
     return grid;
 };
+
+/**
+ * 统一网格更新：路网拓扑 → 区域标记 → 服务覆盖
+ * 每次道路或建筑增删后调用
+ */
+export const updateFullGrid = (grid: CellData[][]): void => {
+    updateRoadNetwork(grid);
+    calculateZones(grid);
+    calculateServiceCoverage(grid);
+};
+
+// Re-export for convenience
+export { checkConnectedRoadAdjacency, updateRoadNetwork } from './roadNetwork';
+export { calculateServiceCoverage, getBuildingServiceInfo } from './serviceRadius';
 
 export const getThickLinePoints = (x0: number, y0: number, x1: number, y1: number, width: number) => {
     const points: {x: number, y: number}[] = [];

@@ -10,8 +10,9 @@ import {
     DollarSign, School, Save, Info, Settings, Play, FastForward, UserPlus, ArrowLeft, X
 } from 'lucide-react';
 import { COLLEGES_DEF, BUILDINGS, VARIANTS, generateName, MISSIONS_DEF } from '../../data/gameData';
-import { 
-    generateId, formatMoney, getGameDate, calculateStats, getThickLinePoints, createInitialGrid 
+import {
+    generateId, formatMoney, getGameDate, calculateStats, getThickLinePoints, createInitialGrid,
+    getBuildingServiceInfo, checkConnectedRoadAdjacency
 } from '../../utils/gameUtils';
 import { SaveManager } from '../../utils/saveManager';
 import { getDeviceType, DeviceType } from '../../utils/deviceDetect';
@@ -67,7 +68,7 @@ export const CampusPlanner: React.FC = () => {
   const [deviceType] = useState<DeviceType>(() => getDeviceType());
   const [viewState, setViewState] = useState(() => {
     const zoom = deviceType === 'phone' ? 0.4 : deviceType === 'pad' ? 0.5 : 0.6;
-    return { x: 0, y: 0, zoom, pitch: 55, yaw: 0 };
+    return { x: 0, y: 0, zoom };
   });
   
   // Interaction Refs
@@ -93,7 +94,6 @@ export const CampusPlanner: React.FC = () => {
   });
   
   // Modals & Events Flags
-  const [is2DMode, setIs2DMode] = useState(false);
   const [potentialHires, setPotentialHires] = useState<Faculty[]>([]);
   const [recruitmentOpen, setRecruitmentOpen] = useState(false); 
   const [recruitmentConfigOpen, setRecruitmentConfigOpen] = useState(false); 
@@ -182,12 +182,11 @@ export const CampusPlanner: React.FC = () => {
   useEffect(() => { 
       const updateLoop = () => { 
           if (keysPressed.current.size > 0 && appPhase === 'GAME') {
-              setViewState(p => { 
+              setViewState(p => {
                   const s = (10 / p.zoom) * appSettings.cameraPanSensitivity;
-                  const r = (p.yaw * Math.PI) / 180;
                   const dx = (keysPressed.current.has('d') ? 1 : 0) - (keysPressed.current.has('a') ? 1 : 0);
                   const dy = (keysPressed.current.has('s') ? 1 : 0) - (keysPressed.current.has('w') ? 1 : 0);
-                  return { ...p, x: p.x + (dx * Math.cos(r) - dy * Math.sin(r)) * s, y: p.y + (dx * Math.sin(r) + dy * Math.cos(r)) * s };
+                  return { ...p, x: p.x + dx * s, y: p.y + dy * s };
               });
           }
           rafRef.current = requestAnimationFrame(updateLoop); 
@@ -234,26 +233,17 @@ export const CampusPlanner: React.FC = () => {
               inputRef.current.isPanning = true; inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY;
           }
       }
-      if (e.button === 1) { // Middle Click
-          e.preventDefault(); 
-          if (!is2DMode) { 
-              inputRef.current.isRotating = true; inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY; 
-          }
+      if (e.button === 1) { // Middle Click - pan
+          e.preventDefault();
+          inputRef.current.isPanning = true; inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY;
       }
   };
 
   const handleMapMouseMove = (e: React.MouseEvent) => {
-      if (inputRef.current.isRotating && !is2DMode) {
-          const dx = e.clientX - inputRef.current.panStartX; const dy = e.clientY - inputRef.current.panStartY;
-          setViewState(p => ({ ...p, yaw: p.yaw - dx * 0.5, pitch: Math.max(10, Math.min(85, p.pitch - dy * 0.5)) }));
-          inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY;
-          return;
-      }
       if (inputRef.current.isPanning) {
           const dx = e.clientX - inputRef.current.panStartX; const dy = e.clientY - inputRef.current.panStartY;
           const s = (1/viewState.zoom)*appSettings.cameraPanSensitivity;
-          const r = (viewState.yaw*Math.PI)/180;
-          setViewState(p => ({ ...p, x: p.x - (dx*Math.cos(r)+dy*Math.sin(r))*s, y: p.y - (dy*Math.cos(r)-dx*Math.sin(r))*s }));
+          setViewState(p => ({ ...p, x: p.x - dx * s, y: p.y - dy * s }));
           inputRef.current.panStartX = e.clientX; inputRef.current.panStartY = e.clientY;
       }
   };
@@ -326,13 +316,11 @@ export const CampusPlanner: React.FC = () => {
 
       if (t.moved) {
         t.isTouchPanning = true;
-        // Single-finger pan (same logic as mouse pan)
         const s = (1 / viewState.zoom) * appSettings.cameraPanSensitivity;
-        const r = (viewState.yaw * Math.PI) / 180;
         setViewState(p => ({
           ...p,
-          x: p.x - (dx * Math.cos(r) + dy * Math.sin(r)) * s,
-          y: p.y - (dy * Math.cos(r) - dx * Math.sin(r)) * s,
+          x: p.x - dx * s,
+          y: p.y - dy * s,
         }));
       }
       t.lastX = touch.clientX;
@@ -346,8 +334,6 @@ export const CampusPlanner: React.FC = () => {
       setViewState(p => ({
         ...p,
         zoom: Math.max(0.2, Math.min(2.0, t.initialZoom * scale)),
-        // Two-finger rotate (only in 3D mode)
-        ...(!is2DMode ? { yaw: t.initialYaw - (angle - t.initialPinchAngle) } : {}),
       }));
     }
   };
@@ -475,9 +461,8 @@ export const CampusPlanner: React.FC = () => {
         <div className="absolute inset-0 top-14 sm:top-16 pb-0 z-0">
             {/* Memoized GameViewport using grid prop for optimization */}
             <GameViewport 
-                grid={gameState.grid} 
-                viewState={viewState} 
-                is2DMode={is2DMode} 
+                grid={gameState.grid}
+                viewState={viewState}
                 appSettings={appSettings}
                 onMouseDown={handleMapMouseDown} 
                 onMouseMove={handleMapMouseMove} 
@@ -506,15 +491,6 @@ export const CampusPlanner: React.FC = () => {
             selectedTool={selectedTool} setSelectedTool={setSelectedTool} selectedVariantIndex={selectedVariantIndex} setSelectedVariantIndex={setSelectedVariantIndex}
             isRotated={isRotated} onToggleRotate={() => setIsRotated(p => !p)}
             deviceType={deviceType}
-            is2DMode={is2DMode} onToggle2D={() => {
-                const newIs2D = !is2DMode;
-                setIs2DMode(newIs2D);
-                if (newIs2D) {
-                    setViewState(prev => ({ ...prev, pitch: 0, yaw: 0 }));
-                } else {
-                    setViewState(prev => ({ ...prev, pitch: 55 }));
-                }
-            }}
         />
 
         {activeSidebarTab && activeSidebarTab !== 'BUILD' && (() => {
@@ -545,9 +521,23 @@ export const CampusPlanner: React.FC = () => {
             );
         })()}
 
-        <BuildingInspector 
-            selectedBuilding={selectedBuilding} renameValue={renameValue} onRenameChange={setRenameValue} 
-            onRenameSubmit={(n) => handlers.renameBuilding(selectedBuilding!.id, n)} onClose={() => setSelectedBuilding(null)} onRemove={handlers.removeBuilding} 
+        <BuildingInspector
+            selectedBuilding={selectedBuilding} renameValue={renameValue} onRenameChange={setRenameValue}
+            onRenameSubmit={(n) => handlers.renameBuilding(selectedBuilding!.id, n)} onClose={() => setSelectedBuilding(null)} onRemove={handlers.removeBuilding}
+            serviceCoverage={selectedBuilding?.cell.isOrigin ? getBuildingServiceInfo(gameState.grid, selectedBuilding.cell.x, selectedBuilding.cell.y) : undefined}
+            isConnected={selectedBuilding ? (() => {
+                const c = selectedBuilding.cell;
+                const def = BUILDINGS[c.building];
+                if (def.requiresRoadConnection === false) return true;
+                if (!c.isOrigin) return undefined;
+                const variants = VARIANTS[c.building];
+                const variant = variants?.find(v => v.id === c.variantId);
+                const bw = variant ? variant.width : (def.width || 1);
+                const bh = variant ? variant.height : (def.height || 1);
+                const w = c.rotation ? bh : bw;
+                const h = c.rotation ? bw : bh;
+                return checkConnectedRoadAdjacency(gameState.grid, c.x, c.y, w, h).valid;
+            })() : undefined}
         />
 
         {/* Modals Layer */}
