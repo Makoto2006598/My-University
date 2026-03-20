@@ -1,10 +1,115 @@
 
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { CellData, BuildingType, ConstructionStatus, GRID_SIZE } from '../../types';
 import { Building3DBox, getTextureStyle } from './Visuals';
 import { BUILDINGS, VARIANTS } from '../../data/gameData';
 import { formatMoney, checkConnectedRoadAdjacency } from '../../utils/gameUtils';
 import { Hammer, AlertTriangle } from 'lucide-react';
+
+const CELL_SIZE_PX = 37;
+
+// Memoized single grid cell - only re-renders when cell data actually changes
+const GridCell = React.memo<{
+    cell: CellData;
+    x: number;
+    y: number;
+    isHovered: boolean;
+    isDragged: boolean;
+    is2DMode: boolean;
+    onCtx: (e: React.MouseEvent) => void;
+}>(({ cell, x, y, isHovered, isDragged, is2DMode, onCtx }) => {
+    const hasBuilding = cell.building !== BuildingType.NONE;
+    const isRoad = cell.building === BuildingType.ROAD || cell.building === BuildingType.CITY_ROAD;
+    const isFence = cell.building === BuildingType.FENCE;
+    const isOriginBuilding = hasBuilding && !isRoad && !isFence && cell.isOrigin;
+
+    // Cache texture style
+    const textureStyle = useMemo(() => hasBuilding ? getTextureStyle(cell) : {},
+        [cell.building, cell.roadShape, cell.isConnectedToCampus, cell.rotation]);
+
+    // Building dimensions (only for origin buildings)
+    const dims = useMemo(() => {
+        if (!isOriginBuilding) return null;
+        const variants = VARIANTS[cell.building];
+        const variant = variants?.find(v => v.id === cell.variantId);
+        const bw = variant ? variant.width : (BUILDINGS[cell.building].width || 1);
+        const bh = variant ? variant.height : (BUILDINGS[cell.building].height || 1);
+        return {
+            w: (cell.rotation ? bh : bw) * CELL_SIZE_PX,
+            h: (cell.rotation ? bw : bh) * CELL_SIZE_PX,
+        };
+    }, [isOriginBuilding, cell.building, cell.variantId, cell.rotation]);
+
+    return (
+        <div
+            className={`absolute ${isHovered ? 'bg-white/30' : ''} ${isDragged ? 'bg-blue-500/50' : ''}`}
+            style={{
+                left: x * CELL_SIZE_PX,
+                top: y * CELL_SIZE_PX,
+                width: CELL_SIZE_PX,
+                height: CELL_SIZE_PX,
+                ...textureStyle,
+                transformStyle: 'preserve-3d',
+            }}
+            onContextMenu={onCtx}
+        >
+            {cell.constructionStatus === ConstructionStatus.CONSTRUCTING && (
+                <div className="absolute inset-0 z-10 bg-orange-100/80 border border-yellow-500/50 overflow-hidden" style={{transform: 'translateZ(1px)'}}>
+                    <div className="absolute inset-0 opacity-20" style={{backgroundImage: 'repeating-linear-gradient(45deg, #fbbf24 0, #fbbf24 5px, transparent 5px, transparent 10px)'}}></div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-800 text-[10px] font-bold">
+                        <Hammer className="w-6 h-6 text-orange-500 animate-bounce mb-1" />
+                        <span>{Math.floor(((BUILDINGS[cell.building].constructionTime - (cell.constructionLeft || 0)) / Math.max(1, BUILDINGS[cell.building].constructionTime)) * 100)}%</span>
+                    </div>
+                </div>
+            )}
+
+            {!is2DMode && isOriginBuilding && dims && (
+                <Building3DBox
+                    width={dims.w}
+                    depth={dims.h}
+                    height={cell.constructionStatus === ConstructionStatus.CONSTRUCTING ? 10 : 40}
+                    colorClass={cell.constructionStatus === ConstructionStatus.CONSTRUCTING ? 'bg-yellow-500/50' : BUILDINGS[cell.building].color}
+                    textureStyle={textureStyle}
+                    cell={cell}
+                />
+            )}
+
+            {is2DMode && isOriginBuilding && dims && (
+                <div className={`absolute ${BUILDINGS[cell.building].color} border border-white/30 flex items-center justify-center pointer-events-none z-10`}
+                    style={{ width: dims.w, height: dims.h }}
+                >
+                    <span className="text-white text-[10px] font-bold drop-shadow truncate px-1">
+                        {BUILDINGS[cell.building].icon} {cell.customName || BUILDINGS[cell.building].name}
+                    </span>
+                </div>
+            )}
+
+            {cell.building === BuildingType.ROAD && cell.isConnectedToCampus === false && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center" style={{transform: 'translateZ(2px)'}}>
+                    <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
+                </div>
+            )}
+
+            {cell.serviceCoverage && cell.building === BuildingType.NONE && (
+                <div className={`absolute inset-0 pointer-events-none ${
+                    cell.serviceCoverage.food ? 'bg-orange-400/8' :
+                    cell.serviceCoverage.study ? 'bg-blue-400/8' :
+                    cell.serviceCoverage.recreation ? 'bg-green-400/8' : ''
+                }`} />
+            )}
+
+            {cell.isZoned && cell.building === BuildingType.NONE && (
+                <div className="absolute inset-0 bg-orange-500/10 border border-orange-500/20" />
+            )}
+        </div>
+    );
+}, (prev, next) => {
+    // Custom comparison: only re-render when cell content or interaction state changes
+    return prev.cell === next.cell
+        && prev.isHovered === next.isHovered
+        && prev.isDragged === next.isDragged
+        && prev.is2DMode === next.is2DMode;
+});
 
 interface GameViewportProps {
     grid: CellData[][];
@@ -28,17 +133,21 @@ interface GameViewportProps {
     onTouchEnd: (e: React.TouchEvent) => void;
 }
 
-// Wrap in memo to prevent re-renders when money/students change, only when grid changes
 export const GameViewport: React.FC<GameViewportProps> = React.memo(({
     grid, viewState, is2DMode, appSettings,
     onMouseDown, onMouseMove, onMouseUp, onMouseLeave, onContextMenu,
     hoveredCell, setHoveredCell, dragPath, selectedTool, isRotated, selectedVariantIndex, onWheel,
     onTouchStart, onTouchMove, onTouchEnd
 }) => {
-    const CELL_SIZE_PX = 37;
+    // Pre-compute drag path as a Set for O(1) lookup
+    const dragSet = useMemo(() => {
+        const s = new Set<string>();
+        dragPath.forEach(p => s.add(`${p.x},${p.y}`));
+        return s;
+    }, [dragPath]);
 
     // Shared hit-test: screen coords -> grid cell
-    const screenToGrid = (clientX: number, clientY: number, rect: DOMRect): { x: number, y: number } | null => {
+    const screenToGrid = useCallback((clientX: number, clientY: number, rect: DOMRect): { x: number, y: number } | null => {
         const mx = clientX - rect.left;
         const my = clientY - rect.top;
         const centerX = rect.width / 2;
@@ -49,7 +158,6 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
         const P = 2000;
         const zoom = viewState.zoom;
         const pitchRad = (viewState.pitch * Math.PI) / 180;
-        const yawRad = (viewState.yaw * Math.PI) / 180;
         const cosP = Math.cos(pitchRad);
         const sinP = Math.sin(pitchRad);
         const vx = viewState.x;
@@ -66,6 +174,7 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
         const A = relX / (zoom * D);
         const rx = A + vx;
 
+        const yawRad = (viewState.yaw * Math.PI) / 180;
         const cosY = Math.cos(-yawRad);
         const sinY = Math.sin(-yawRad);
         const worldX = rx * cosY - ry * sinY;
@@ -78,9 +187,9 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
             return { x: gridX, y: gridY };
         }
         return null;
-    };
+    }, [viewState.x, viewState.y, viewState.zoom, viewState.pitch, viewState.yaw]);
 
-    const handleMouseMove = (e: React.MouseEvent) => {
+    const handleMouseMove = useCallback((e: React.MouseEvent) => {
         onMouseMove(e);
         const rect = e.currentTarget.getBoundingClientRect();
         const cell = screenToGrid(e.clientX, e.clientY, rect);
@@ -89,13 +198,12 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                 setHoveredCell(cell);
             }
         } else {
-            setHoveredCell(null);
+            if (hoveredCell) setHoveredCell(null);
         }
-    };
+    }, [onMouseMove, screenToGrid, hoveredCell, setHoveredCell]);
 
-    const handleTouchMove = (e: React.TouchEvent) => {
+    const handleTouchMove = useCallback((e: React.TouchEvent) => {
         onTouchMove(e);
-        // Update hovered cell from first touch point
         if (e.touches.length === 1) {
             const rect = e.currentTarget.getBoundingClientRect();
             const touch = e.touches[0];
@@ -105,42 +213,13 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                     setHoveredCell(cell);
                 }
             } else {
-                setHoveredCell(null);
+                if (hoveredCell) setHoveredCell(null);
             }
         }
-    };
+    }, [onTouchMove, screenToGrid, hoveredCell, setHoveredCell]);
 
-    // Helper to check placement validity
-    const checkPlacementValid = (x: number, y: number, w: number, h: number, tool: BuildingType): { valid: boolean; reason?: string } => {
-        // Bounds check
-        if (x + w > GRID_SIZE || y + h > GRID_SIZE) return { valid: false, reason: '超出边界' };
-
-        // Collision check
-        for (let dy = 0; dy < h; dy++) {
-            for (let dx = 0; dx < w; dx++) {
-                const cell = grid[y + dy]?.[x + dx];
-                if (!cell) return { valid: false, reason: '超出边界' };
-                if (cell.building !== BuildingType.NONE && cell.building !== BuildingType.FENCE) {
-                    return { valid: false, reason: '被占用' };
-                }
-            }
-        }
-
-        // Road connectivity check
-        const def = BUILDINGS[tool];
-        const needsRoad = def.requiresRoadConnection !== false && ![BuildingType.ROAD, BuildingType.CITY_ROAD].includes(tool);
-        if (needsRoad && tool !== BuildingType.SCHOOL_GATE) {
-            const roadCheck = checkConnectedRoadAdjacency(grid, x, y, w, h);
-            if (!roadCheck.valid) {
-                return { valid: false, reason: roadCheck.reason || '需要连接道路' };
-            }
-        }
-
-        return { valid: true };
-    };
-
-    // Helper to render ghost building
-    const renderGhost = () => {
+    // Ghost building
+    const ghost = useMemo(() => {
         if (!hoveredCell) return null;
         if (selectedTool === BuildingType.NONE || selectedTool === BuildingType.ROAD) return null;
 
@@ -163,7 +242,29 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
         }
 
         const cost = variant?.cost || BUILDINGS[selectedTool].cost;
-        const { valid, reason } = checkPlacementValid(hoveredCell.x, hoveredCell.y, width, height, selectedTool);
+
+        // Placement validity check
+        let valid = true;
+        let reason = '';
+        if (hoveredCell.x + width > GRID_SIZE || hoveredCell.y + height > GRID_SIZE) {
+            valid = false; reason = '超出边界';
+        } else {
+            for (let dy = 0; dy < height && valid; dy++) {
+                for (let dx = 0; dx < width && valid; dx++) {
+                    const c = grid[hoveredCell.y + dy]?.[hoveredCell.x + dx];
+                    if (!c) { valid = false; reason = '超出边界'; }
+                    else if (c.building !== BuildingType.NONE && c.building !== BuildingType.FENCE) { valid = false; reason = '被占用'; }
+                }
+            }
+            if (valid) {
+                const def = BUILDINGS[selectedTool];
+                const needsRoad = def.requiresRoadConnection !== false && ![BuildingType.ROAD, BuildingType.CITY_ROAD].includes(selectedTool);
+                if (needsRoad && selectedTool !== BuildingType.SCHOOL_GATE) {
+                    const roadCheck = checkConnectedRoadAdjacency(grid, hoveredCell.x, hoveredCell.y, width, height);
+                    if (!roadCheck.valid) { valid = false; reason = roadCheck.reason || '需要连接道路'; }
+                }
+            }
+        }
 
         const def = BUILDINGS[selectedTool];
         const serviceRadius = def.serviceRadius;
@@ -175,7 +276,6 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
 
         return (
             <>
-                {/* 服务半径预览圈 */}
                 {valid && serviceRadius && def.serviceType && (
                     <div className={`absolute pointer-events-none z-40 rounded-full border-2 border-dashed ${serviceColors[def.serviceType] || ''}`}
                         style={{
@@ -187,9 +287,7 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                     />
                 )}
                 <div className={`absolute border-2 pointer-events-none z-50 transition-all duration-75 flex flex-col items-center justify-center font-bold text-xs ${
-                    valid
-                        ? 'border-emerald-400/70 bg-emerald-500/25'
-                        : 'border-red-400/70 bg-red-500/25'
+                    valid ? 'border-emerald-400/70 bg-emerald-500/25' : 'border-red-400/70 bg-red-500/25'
                 }`}
                     style={{
                         left: hoveredCell.x * CELL_SIZE_PX,
@@ -205,7 +303,17 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                 </div>
             </>
         );
-    };
+    }, [hoveredCell, selectedTool, selectedVariantIndex, isRotated, grid]);
+
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+        if (e.touches.length === 1) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const touch = e.touches[0];
+            const cell = screenToGrid(touch.clientX, touch.clientY, rect);
+            if (cell) setHoveredCell(cell);
+        }
+        onTouchStart(e);
+    }, [screenToGrid, setHoveredCell, onTouchStart]);
 
     return (
         <div
@@ -216,15 +324,7 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseLeave}
             onWheel={onWheel}
-            onTouchStart={(e) => {
-                if (e.touches.length === 1) {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const touch = e.touches[0];
-                    const cell = screenToGrid(touch.clientX, touch.clientY, rect);
-                    if (cell) setHoveredCell(cell);
-                }
-                onTouchStart(e);
-            }}
+            onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={onTouchEnd}
         >
@@ -241,7 +341,6 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                     `
                 }}
             >
-                {/* The Map Plane (Ground) */}
                 <div
                     className="absolute bg-[#e6efc5] shadow-2xl transform-style-3d"
                     style={{
@@ -256,100 +355,29 @@ export const GameViewport: React.FC<GameViewportProps> = React.memo(({
                         backgroundColor: '#ecfccb'
                     }}
                 >
-                    {/* Render Cells */}
-                    {grid.map((row, y) => row.map((cell, x) => (
-                        <div
-                            key={`${x}-${y}`}
-                            className={`absolute transition-colors duration-200 ${
-                                hoveredCell?.x === x && hoveredCell?.y === y ? 'bg-white/30' : ''
-                            } ${
-                                dragPath.some(p => p.x === x && p.y === y) ? 'bg-blue-500/50' : ''
-                            }`}
-                            style={{
-                                left: x * CELL_SIZE_PX,
-                                top: y * CELL_SIZE_PX,
-                                width: CELL_SIZE_PX,
-                                height: CELL_SIZE_PX,
-                                ...getTextureStyle(cell),
-                                transformStyle: 'preserve-3d',
-                                backfaceVisibility: 'hidden',
-                            }}
-                            onContextMenu={(e) => onContextMenu(e, x, y)}
-                        >
-                            {/* Construction Overlay */}
-                            {cell.constructionStatus === ConstructionStatus.CONSTRUCTING && (
-                                <div className="absolute inset-0 z-10 bg-orange-100/80 border border-yellow-500/50 overflow-hidden" style={{transform: 'translateZ(1px)'}}>
-                                    <div className="absolute inset-0 opacity-20" style={{backgroundImage: 'repeating-linear-gradient(45deg, #fbbf24 0, #fbbf24 5px, transparent 5px, transparent 10px)'}}></div>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-800 text-[10px] font-bold">
-                                        <Hammer className="w-6 h-6 text-orange-500 animate-bounce mb-1" />
-                                        <span>{Math.floor(((BUILDINGS[cell.building].constructionTime - (cell.constructionLeft || 0)) / Math.max(1, BUILDINGS[cell.building].constructionTime)) * 100)}%</span>
-                                    </div>
-                                </div>
-                            )}
+                    {grid.map((row, y) => row.map((cell, x) => {
+                        // Skip rendering completely empty cells with no interactions
+                        const isHovered = hoveredCell?.x === x && hoveredCell?.y === y;
+                        const isDragged = dragSet.has(`${x},${y}`);
+                        if (cell.building === BuildingType.NONE && !cell.isZoned && !cell.serviceCoverage && !isHovered && !isDragged) return null;
 
-                            {/* Render Building 3D Object (only in 3D mode) */}
-                            {!is2DMode && cell.building !== BuildingType.NONE && cell.building !== BuildingType.ROAD && cell.building !== BuildingType.CITY_ROAD && cell.building !== BuildingType.FENCE && cell.isOrigin && (
-                                <Building3DBox
-                                    width={
-                                        (cell.rotation ? (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.height || 1) : (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.width || 1)) * CELL_SIZE_PX
-                                    }
-                                    depth={
-                                        (cell.rotation ? (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.width || 1) : (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.height || 1)) * CELL_SIZE_PX
-                                    }
-                                    height={
-                                        cell.constructionStatus === ConstructionStatus.CONSTRUCTING
-                                        ? 10
-                                        : 40
-                                    }
-                                    colorClass={
-                                        cell.constructionStatus === ConstructionStatus.CONSTRUCTING
-                                        ? 'bg-yellow-500/50'
-                                        : BUILDINGS[cell.building].color
-                                    }
-                                    textureStyle={getTextureStyle(cell)}
-                                    cell={cell}
-                                />
-                            )}
-                            {/* 2D mode: flat building label */}
-                            {is2DMode && cell.building !== BuildingType.NONE && cell.building !== BuildingType.ROAD && cell.building !== BuildingType.CITY_ROAD && cell.building !== BuildingType.FENCE && cell.isOrigin && (
-                                <div className={`absolute ${BUILDINGS[cell.building].color} border border-white/30 flex items-center justify-center pointer-events-none z-10`}
-                                    style={{
-                                        width: (cell.rotation ? (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.height || 1) : (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.width || 1)) * CELL_SIZE_PX,
-                                        height: (cell.rotation ? (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.width || 1) : (VARIANTS[cell.building]?.find(v => v.id === cell.variantId)?.height || 1)) * CELL_SIZE_PX,
-                                    }}
-                                >
-                                    <span className="text-white text-[10px] font-bold drop-shadow truncate px-1">
-                                        {BUILDINGS[cell.building].icon} {cell.customName || BUILDINGS[cell.building].name}
-                                    </span>
-                                </div>
-                            )}
+                        return (
+                            <GridCell
+                                key={`${x}-${y}`}
+                                cell={cell}
+                                x={x}
+                                y={y}
+                                isHovered={isHovered}
+                                isDragged={isDragged}
+                                is2DMode={is2DMode}
+                                onCtx={(e) => onContextMenu(e, x, y)}
+                            />
+                        );
+                    }))}
 
-                            {/* 未连通道路警告 */}
-                            {cell.building === BuildingType.ROAD && cell.isConnectedToCampus === false && (
-                                <div className="absolute inset-0 z-10 flex items-center justify-center" style={{transform: 'translateZ(2px)'}}>
-                                    <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
-                                </div>
-                            )}
-
-                            {/* 服务覆盖可视化 */}
-                            {cell.serviceCoverage && cell.building === BuildingType.NONE && (
-                                <div className={`absolute inset-0 pointer-events-none ${
-                                    cell.serviceCoverage.food ? 'bg-orange-400/8' :
-                                    cell.serviceCoverage.study ? 'bg-blue-400/8' :
-                                    cell.serviceCoverage.recreation ? 'bg-green-400/8' : ''
-                                }`}></div>
-                            )}
-
-                            {/* Zone Highlight */}
-                            {cell.isZoned && cell.building === BuildingType.NONE && <div className="absolute inset-0 bg-orange-500/10 border border-orange-500/20"></div>}
-                        </div>
-                    )))}
-
-                    {/* Ghost Building for Placement */}
-                    {renderGhost()}
+                    {ghost}
                 </div>
             </div>
-            {/* Compass / Orientation Indicator */}
             <div className="absolute top-4 right-4 bg-white/80 backdrop-blur p-2 rounded-full border border-orange-200 pointer-events-none shadow-md">
                 <div className="w-8 h-8 rounded-full border-2 border-orange-400 relative flex items-center justify-center" style={{ transform: `rotate(${-viewState.yaw}deg)` }}>
                     <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[8px] border-b-red-500 absolute -top-1"></div>

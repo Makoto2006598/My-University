@@ -139,26 +139,34 @@ export const useGameLogic = (
                     }
                 });
 
-                // Construction & Stats
+                // Construction & Stats - only clone cells that actually change
                 const nextDay = prev.day + 1;
                 let anyCompleted = false;
-                const newGrid = prev.grid.map(row => row.map(cell => {
-                    if (cell.constructionStatus === ConstructionStatus.CONSTRUCTING && cell.constructionLeft !== undefined) {
-                        const newLeft = cell.constructionLeft - 1;
-                        if (newLeft <= 0) {
-                            anyCompleted = true;
-                            return { ...cell, constructionStatus: ConstructionStatus.COMPLETED, constructionLeft: 0 };
+                let gridChanged = false;
+                const newGrid = prev.grid.map(row => {
+                    let rowChanged = false;
+                    const newRow = row.map(cell => {
+                        if (cell.constructionStatus === ConstructionStatus.CONSTRUCTING && cell.constructionLeft !== undefined) {
+                            rowChanged = true;
+                            gridChanged = true;
+                            const newLeft = cell.constructionLeft - 1;
+                            if (newLeft <= 0) {
+                                anyCompleted = true;
+                                return { ...cell, constructionStatus: ConstructionStatus.COMPLETED, constructionLeft: 0 };
+                            }
+                            return { ...cell, constructionLeft: newLeft };
                         }
-                        return { ...cell, constructionLeft: newLeft };
-                    }
-                    return cell;
-                }));
+                        return cell;
+                    });
+                    return rowChanged ? newRow : row;
+                });
                 // 建筑完工时重新计算服务覆盖
                 if (anyCompleted) {
                     updateFullGrid(newGrid);
                 }
 
-                const stats = calculateStats(newGrid, prev.students, prev.happiness, prev);
+                const effectiveGrid = gridChanged ? newGrid : prev.grid;
+                const stats = calculateStats(effectiveGrid, prev.students, prev.happiness, prev);
                 const netIncome = stats.netIncome - dailyPublicityCost + liaisonGrant;
                 
                 const totalMinistryRecognition = stats.ministryRecognition + (prev.publicity.ministryBonus || 0);
@@ -219,7 +227,7 @@ export const useGameLogic = (
                     happiness: Math.round(newHappiness),
                     faculty: updatedFaculty,
                     financeHistory: [...prev.financeHistory, newHistoryPoint].slice(-60),
-                    grid: newGrid,
+                    grid: effectiveGrid,
                     incomingStudents: newIncoming,
                     budgetConfirmed: newBudgetConfirmed,
                     admissionsPhase: newAdmissionsPhase,

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
     GRID_SIZE, BuildingType, BuildingDef, CellData, UniType1, UniType2, Faculty, 
     CollegeType, FacultyTitle, RecruitmentMethod, UniversityScale, UniversityRank, 
@@ -113,8 +113,9 @@ export const CampusPlanner: React.FC = () => {
   const [selectedCollegeIdForDean, setSelectedCollegeIdForDean] = useState<string | null>(null);
   const [selectedDeanRole, setSelectedDeanRole] = useState<'DEAN' | 'VICE_DEAN' | null>(null);
 
-  const currentStats = calculateStats(gameState.grid, gameState.students, gameState.happiness, gameState);
-  const gameDate = getGameDate(gameState.day);
+  const currentStats = useMemo(() => calculateStats(gameState.grid, gameState.students, gameState.happiness, gameState),
+    [gameState.grid, gameState.students, gameState.happiness, gameState.day, gameState.faculty.length, gameState.financeSettings]);
+  const gameDate = useMemo(() => getGameDate(gameState.day), [gameState.day]);
   const hasAnySave = useMemo(() => SaveManager.getLatestSlot() !== null, [refreshKey, appPhase]);
 
   // --- Handlers Wrappers ---
@@ -212,6 +213,11 @@ export const CampusPlanner: React.FC = () => {
   }, [gameState.day, appPhase, gameState.budgetConfirmed, gameState.admissionsPhase]);
 
   // --- Map Interaction ---
+  const handleContextMenu = useCallback((e: React.MouseEvent, x: number, y: number) => {
+      e.preventDefault();
+      handlers.removeBuilding(gameState.grid[y][x].buildingId || "");
+  }, [gameState.grid, handlers]);
+
   const handleMapMouseDown = (e: React.MouseEvent) => {
       if (e.button === 0) { // Left Click
           if (selectedTool !== BuildingType.NONE && hoveredCell) {
@@ -483,7 +489,7 @@ export const CampusPlanner: React.FC = () => {
                 onMouseMove={handleMapMouseMove} 
                 onMouseUp={handleMapMouseUp} 
                 onMouseLeave={handleMapMouseLeave} 
-                onContextMenu={(e, x, y) => { e.preventDefault(); handlers.removeBuilding(gameState.grid[y][x].buildingId || ""); }}
+                onContextMenu={handleContextMenu}
                 hoveredCell={hoveredCell} 
                 setHoveredCell={setHoveredCell} 
                 dragPath={dragPath} 
