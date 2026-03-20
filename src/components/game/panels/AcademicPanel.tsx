@@ -2,16 +2,16 @@
 import React, { useState } from 'react';
 import { GameState, CollegeType, FacultyTitle, Faculty, UniversityRank } from '../../../types';
 import { COLLEGES_DEF, MAJORS_DEF } from '../../../data/gameData';
-
-const RANK_ORDER: UniversityRank[] = [
-    UniversityRank.STARTUP, UniversityRank.TIER_3, UniversityRank.TIER_2,
-    UniversityRank.TIER_1, UniversityRank.PROJECT_211, UniversityRank.PROJECT_985
-];
-const meetsRank = (current: UniversityRank, required?: UniversityRank) => {
-    if (!required) return true;
-    return RANK_ORDER.indexOf(current) >= RANK_ORDER.indexOf(required);
-};
 import { getDeanManagementAbility } from '../../../utils/gameUtils';
+
+const COLLEGE_CAP: Record<UniversityRank, number> = {
+    [UniversityRank.STARTUP]: 3,
+    [UniversityRank.TIER_3]: 5,
+    [UniversityRank.TIER_2]: 8,
+    [UniversityRank.TIER_1]: 10,
+    [UniversityRank.PROJECT_211]: 12,
+    [UniversityRank.PROJECT_985]: 14,
+};
 import { BookOpen, GraduationCap, Medal, UserPlus, AlertCircle, Check, Lock, ChevronRight, Hammer, Settings, Users, School } from 'lucide-react';
 
 interface AcademicPanelProps {
@@ -25,10 +25,13 @@ type SubTab = 'CONSTRUCTION' | 'COLLEGES' | 'FACULTY' | 'STUDENTS';
 export const AcademicPanel: React.FC<AcademicPanelProps> = ({ gameState, setGameState, onAssignDean }) => {
     const [subTab, setSubTab] = useState<SubTab>('CONSTRUCTION');
 
+    const collegeCap = COLLEGE_CAP[gameState.rank] || 3;
+    const collegeCapReached = gameState.colleges.length >= collegeCap;
+
     const handleCreateCollege = (type: CollegeType) => {
         const def = COLLEGES_DEF[type];
-        if (def.requiredRank && !meetsRank(gameState.rank, def.requiredRank)) {
-            alert(`设立 ${def.name} 需要大学等级达到 ${def.requiredRank}！`);
+        if (collegeCapReached) {
+            alert(`当前等级 (${gameState.rank}) 最多可设立 ${collegeCap} 个学院！`);
             return;
         }
         if (def.dependency && !gameState.colleges.find(c => c.type === def.dependency)) {
@@ -93,12 +96,15 @@ export const AcademicPanel: React.FC<AcademicPanelProps> = ({ gameState, setGame
                     {subTab === 'CONSTRUCTION' && (
                         <div className="animate-in fade-in slide-in-from-bottom-2">
                             <h3 className="text-sm font-bold text-stone-500 mb-4 uppercase">筹建新学院</h3>
+                            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-800 flex items-center gap-2">
+                                <School className="w-4 h-4 shrink-0"/>
+                                <span>当前等级: <span className="font-bold">{gameState.rank}</span> — 学院上限: <span className="font-bold">{collegeCap}</span> 个 (已设立 {gameState.colleges.length} 个)</span>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {(Object.values(COLLEGES_DEF) as any[]).map((def: any) => {
                                     const exists = gameState.colleges.find(c => c.type === def.type);
                                     const depLocked = def.dependency && !gameState.colleges.find(c => c.type === def.dependency);
-                                    const rankLocked = def.requiredRank && !meetsRank(gameState.rank, def.requiredRank);
-                                    const isLocked = depLocked || rankLocked;
+                                    const isLocked = depLocked || collegeCapReached;
 
                                     if (exists) return null;
 
@@ -121,9 +127,9 @@ export const AcademicPanel: React.FC<AcademicPanelProps> = ({ gameState, setGame
                                                 <div className="text-xs opacity-70 leading-tight">{def.description}</div>
                                             </div>
                                             <div className="space-y-1">
-                                                {rankLocked && (
+                                                {collegeCapReached && !depLocked && (
                                                     <div className="text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded inline-block w-max border border-amber-200">
-                                                        需要等级: {def.requiredRank}
+                                                        学院数已达上限 ({collegeCap})
                                                     </div>
                                                 )}
                                                 {depLocked && (
