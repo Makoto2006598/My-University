@@ -69,16 +69,17 @@ const generateSingleStudent = (targetCollege: CollegeType, minScore: number): St
     };
 };
 
-export const generateDailyStudents = (policy: AdmissionPolicy, colleges: ActiveCollege[], currentIncomingCount: number): Student[] => {
+export const generateDailyStudents = (policy: AdmissionPolicy, colleges: ActiveCollege[], currentIncomingCount: number, happinessModifier: number = 1): Student[] => {
     // Determine how many students to generate today.
     // The recruiting phase is ~20 days (July 15 - Aug 5).
-    // Daily quota approx total / 20.
+    // Daily quota approx total / 20, modified by happiness.
     const totalTarget = policy.totalTarget;
     if (totalTarget <= 0 || colleges.length === 0) return [];
 
-    const dailyQuota = Math.ceil(totalTarget / 20);
+    const baseDailyQuota = Math.ceil(totalTarget / 20);
+    const dailyQuota = Math.max(1, Math.round(baseDailyQuota * happinessModifier));
     const remainingNeeded = totalTarget - currentIncomingCount;
-    
+
     // Don't overfill too much
     const countToGen = Math.min(dailyQuota, remainingNeeded);
     if (countToGen <= 0) return [];
@@ -121,8 +122,10 @@ export const generateDailyStudents = (policy: AdmissionPolicy, colleges: ActiveC
             }
         }
 
-        // Generate
-        newStudents.push(generateSingleStudent(selectedCollegeType, policy.minScore));
+        // 满意度影响生源质量：高满意度提升分数下限
+        const scoreBonus = Math.floor((happinessModifier - 1) * 30); // -9 to +9
+        const adjustedMinScore = Math.max(300, Math.min(700, policy.minScore + scoreBonus));
+        newStudents.push(generateSingleStudent(selectedCollegeType, adjustedMinScore));
     }
 
     return newStudents;

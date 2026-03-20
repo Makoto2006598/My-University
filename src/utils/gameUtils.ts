@@ -292,6 +292,10 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
     // Faculty Factors
     let fHapp = 50 + envHappiness + svcBonus;
     if (maintenanceRatio < 0.8) { fHapp -= 5; }
+    // 教职工薪资预算是否充足
+    if (salaryRequiredDaily > 0 && facultyAllocated < salaryRequiredDaily * 0.8) { fHapp -= 10; happinessFactors.push({ label: '薪资预算不足', value: -10, type: 'negative' }); }
+    // 科研经费充足加成
+    if (researchAllocated > 5000) { fHapp += 3; }
     facultySatisfaction = Math.min(100, Math.max(0, fHapp));
 
     let avgHappiness = (studentSatisfaction * (currentStudents || 1) + facultySatisfaction * (gameState.faculty.length || 1)) / ((currentStudents || 1) + (gameState.faculty.length || 1));

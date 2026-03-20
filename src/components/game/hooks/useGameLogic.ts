@@ -73,10 +73,12 @@ export const useGameLogic = (
                     newAdmissionsPhase = AdmissionsPhase.RECRUITING;
                 }
                 
-                if (newAdmissionsPhase === AdmissionsPhase.RECRUITING && 
+                if (newAdmissionsPhase === AdmissionsPhase.RECRUITING &&
                    ((currentDate.month === 7 && currentDate.date >= 15) || (currentDate.month === 8 && currentDate.date <= 5))) {
                     if (prev.colleges.length > 0 && prev.admissionPolicy.totalTarget > 0) {
-                        const newStudents = generateDailyStudents(prev.admissionPolicy, prev.colleges, newIncoming.length);
+                        // 满意度影响招生：高满意度吸引更多学生，低满意度减少招生
+                        const happinessModifier = 0.7 + 0.6 * (prev.happiness / 100); // 0.7x ~ 1.3x
+                        const newStudents = generateDailyStudents(prev.admissionPolicy, prev.colleges, newIncoming.length, happinessModifier);
                         newIncoming = [...newIncoming, ...newStudents];
                     }
                 }
@@ -177,14 +179,49 @@ export const useGameLogic = (
                     liaisonIncome: liaisonGrant
                 };
 
-                return { 
-                    ...prev, 
-                    day: nextDay, 
-                    money: prev.money + netIncome, 
-                    financeHistory: [...prev.financeHistory, newHistoryPoint].slice(-60), 
-                    grid: newGrid, 
-                    incomingStudents: newIncoming, 
-                    budgetConfirmed: newBudgetConfirmed, 
+                // 同步满意度到 gameState.happiness
+                const newHappiness = stats.happiness;
+
+                // 更新每位教职工的满意度（基于全局教职工满意度 + 个体因素）
+                const baseFacSat = stats.facultySatisfaction;
+                const resignedIds: string[] = [];
+                const updatedFaculty = prev.faculty.map(f => {
+                    // 薪资满意度: 薪资达到期望的比例
+                    const titleExpected: Record<string, number> = { '院士': 50000, '教授': 30000, '副教授': 20000, '讲师': 12000, '助教': 8000 };
+                    const expected = titleExpected[f.title] || 10000;
+                    const salaryRatio = Math.min(1.5, f.salary / expected);
+                    const salaryBonus = (salaryRatio - 1) * 20; // -20 到 +10
+
+                    // 工龄满意度: 长期教职工如果薪资低会不满
+                    const tenure = (prev.day - f.hireDate) / 365;
+                    const tenurePenalty = tenure > 2 && salaryRatio < 0.9 ? -5 : 0;
+
+                    // 教职工预算充足度
+                    const facultyBudgetRatio = stats.facultyAllocated > 0 ? Math.min(1, stats.facultyAllocated / (stats.salaryRequiredDaily || 1)) : 1;
+                    const budgetBonus = (facultyBudgetRatio - 1) * 10;
+
+                    const newSat = Math.min(100, Math.max(0, baseFacSat + salaryBonus + tenurePenalty + budgetBonus));
+
+                    // 满意度极低时有概率离职（每天检查）
+                    if (newSat < 20 && Math.random() < 0.02) { // 满意度<20: 每天2%概率离职
+                        resignedIds.push(f.id);
+                    } else if (newSat < 35 && Math.random() < 0.005) { // 满意度<35: 每天0.5%概率
+                        resignedIds.push(f.id);
+                    }
+
+                    return { ...f, satisfaction: Math.round(newSat) };
+                }).filter(f => !resignedIds.includes(f.id));
+
+                return {
+                    ...prev,
+                    day: nextDay,
+                    money: prev.money + netIncome,
+                    happiness: Math.round(newHappiness),
+                    faculty: updatedFaculty,
+                    financeHistory: [...prev.financeHistory, newHistoryPoint].slice(-60),
+                    grid: newGrid,
+                    incomingStudents: newIncoming,
+                    budgetConfirmed: newBudgetConfirmed,
                     admissionsPhase: newAdmissionsPhase,
                     socialRecognition: prev.socialRecognition + dailySocialRecGain,
                     ministryRecognition: totalMinistryRecognition,
