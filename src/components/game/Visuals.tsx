@@ -1,8 +1,24 @@
 
 import React from 'react';
-import { BuildingType, CellData, FinanceHistoryPoint } from '../../types';
-import { BUILDINGS } from '../../data/gameData';
+import { BuildingType, CellData, FinanceHistoryPoint, ConstructionStatus } from '../../types';
+import { BUILDINGS, VARIANTS } from '../../data/gameData';
 import { formatMoney } from '../../utils/gameUtils';
+
+export const getBuilding3DHeight = (type: BuildingType, variantId?: string): number => {
+    const variants = VARIANTS[type];
+    const variant = variants?.find(v => v.id === variantId);
+    const area = variant ? variant.width * variant.height : 1;
+    switch(type) {
+        case BuildingType.DORMITORY: return 30 + Math.sqrt(area) * 8;
+        case BuildingType.LECTURE_HALL: return 40 + Math.sqrt(area) * 10;
+        case BuildingType.LABORATORY: return 45 + Math.sqrt(area) * 8;
+        case BuildingType.LIBRARY: return 60 + Math.sqrt(area) * 10;
+        case BuildingType.SCHOOL_GATE: return 30 + Math.sqrt(area) * 5;
+        case BuildingType.CAFETERIA: return 20 + Math.sqrt(area) * 5;
+        case BuildingType.PARK: return 5;
+        default: return 0;
+    }
+};
 
 /**
  * 根据道路形态生成路口纹理样式
@@ -85,6 +101,110 @@ export const getTextureStyle = (cell: CellData): React.CSSProperties => {
         case 'grass': return { backgroundColor: '#10b981', backgroundImage: 'radial-gradient(#059669 1px, transparent 1px)', backgroundSize: '8px 8px' };
         default: return { transform };
     }
+};
+
+export const Cube3D: React.FC<{
+    width: number;
+    depth: number;
+    height: number;
+    x?: number;
+    y?: number;
+    z?: number;
+    colorClass: string;
+    textureStyle: React.CSSProperties;
+    label?: React.ReactNode;
+    opacity?: number;
+}> = ({ width, depth, height, x = 0, y = 0, z = 0, colorClass, textureStyle, label, opacity = 1 }) => {
+    return (
+        <div className="absolute" style={{
+            left: x, top: y, width, height: depth,
+            transform: `translateZ(${z}px)`,
+            transformStyle: 'preserve-3d',
+            pointerEvents: 'none',
+            opacity
+        }}>
+            <div className={`absolute ${colorClass} origin-bottom`} style={{ width: `${width}px`, height: `${height}px`, bottom: 0, left: 0, transform: `rotateX(-90deg)`, filter: 'brightness(0.8)', ...textureStyle, backfaceVisibility: 'hidden' }} />
+            <div className={`absolute ${colorClass} origin-right`} style={{ width: `${depth}px`, height: `${height}px`, top: 0, right: 0, transform: `rotateY(-90deg) rotateZ(90deg)`, transformOrigin: 'right bottom', filter: 'brightness(0.6)', ...textureStyle, backfaceVisibility: 'hidden' }} />
+            <div className={`absolute ${colorClass} origin-top`} style={{ width: `${width}px`, height: `${height}px`, top: 0, left: 0, transform: `rotateX(90deg)`, filter: 'brightness(0.7)', ...textureStyle, backfaceVisibility: 'hidden' }} />
+            <div className={`absolute ${colorClass} origin-left`} style={{ width: `${depth}px`, height: `${height}px`, top: 0, left: 0, transform: `rotateY(90deg) rotateZ(-90deg)`, transformOrigin: 'left bottom', filter: 'brightness(0.9)', ...textureStyle, backfaceVisibility: 'hidden' }} />
+            <div className={`absolute ${colorClass}`} style={{ width: `${width}px`, height: `${depth}px`, top: 0, left: 0, transform: `translateZ(${height}px)`, filter: 'brightness(1.1)', ...textureStyle, backfaceVisibility: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.15)' }}>
+                {label}
+            </div>
+        </div>
+    );
+};
+
+export const Building3DBox: React.FC<{
+    width: number;
+    depth: number;
+    height: number;
+    colorClass: string;
+    textureStyle: React.CSSProperties;
+    cell: CellData;
+}> = ({ width, depth, colorClass, textureStyle, cell }) => {
+    const isConstructing = cell.constructionStatus === ConstructionStatus.CONSTRUCTING;
+    const buildingHeight = isConstructing ? 10 : getBuilding3DHeight(cell.building, cell.variantId);
+    const buildingName = cell.customName || BUILDINGS[cell.building].name;
+    const buildingIcon = BUILDINGS[cell.building].icon;
+
+    const label = (
+        <div className="transform -rotate-45 text-white/70 text-[10px] whitespace-nowrap overflow-hidden flex items-center gap-1 font-medium drop-shadow-sm">
+            <span>{buildingIcon}</span>
+            <span>{buildingName}</span>
+        </div>
+    );
+
+    if (cell.building === BuildingType.LECTURE_HALL && !isConstructing) {
+        const baseHeight = buildingHeight * 0.6;
+        const topHeight = buildingHeight * 0.4;
+        const topScale = 0.65;
+        const topWidth = width * topScale;
+        const topDepth = depth * topScale;
+        return (
+            <div className="absolute inset-0" style={{ transformStyle: 'preserve-3d' }}>
+                <Cube3D width={width} depth={depth} height={baseHeight} colorClass={colorClass} textureStyle={textureStyle} />
+                <Cube3D width={topWidth} depth={topDepth} height={topHeight} x={(width - topWidth)/2} y={(depth - topDepth)/2} z={baseHeight} colorClass={colorClass} textureStyle={textureStyle} label={label} />
+            </div>
+        );
+    }
+
+    if (cell.building === BuildingType.LIBRARY && !isConstructing) {
+        const baseHeight = buildingHeight * 0.5;
+        const topHeight = buildingHeight * 0.5;
+        const topWidth = width * 0.5;
+        const topDepth = depth * 0.7;
+        return (
+            <div className="absolute inset-0" style={{ transformStyle: 'preserve-3d' }}>
+                <Cube3D width={width} depth={depth} height={baseHeight} colorClass={colorClass} textureStyle={textureStyle} />
+                <Cube3D width={topWidth} depth={topDepth} height={topHeight} x={(width - topWidth)/2} y={(depth - topDepth)/2} z={baseHeight} colorClass="bg-teal-500" textureStyle={textureStyle} label={label} />
+            </div>
+        );
+    }
+
+    if (cell.building === BuildingType.SCHOOL_GATE && !isConstructing) {
+        const pillarWidth = Math.min(width * 0.25, 15);
+        const archHeight = buildingHeight * 0.7;
+        const topHeight = buildingHeight * 0.3;
+        return (
+            <div className="absolute inset-0" style={{ transformStyle: 'preserve-3d' }}>
+                <Cube3D width={pillarWidth} depth={depth} height={archHeight} colorClass={colorClass} textureStyle={textureStyle} />
+                <Cube3D width={pillarWidth} depth={depth} height={archHeight} x={width - pillarWidth} colorClass={colorClass} textureStyle={textureStyle} />
+                <Cube3D width={width} depth={depth} height={topHeight} z={archHeight} colorClass="bg-orange-500" textureStyle={textureStyle} label={label} />
+            </div>
+        );
+    }
+
+    return (
+        <div className="absolute inset-0" style={{ transformStyle: 'preserve-3d' }}>
+            <Cube3D
+                width={width} depth={depth} height={buildingHeight}
+                colorClass={isConstructing ? 'bg-yellow-500/50' : colorClass}
+                textureStyle={textureStyle}
+                label={isConstructing ? undefined : label}
+                opacity={isConstructing ? 0.7 : 1}
+            />
+        </div>
+    );
 };
 
 export const SimpleLineChart: React.FC<{ data: FinanceHistoryPoint[], dataKeys: (keyof FinanceHistoryPoint)[], colors: string[], height?: number }> = ({ data, dataKeys, colors, height = 150 }) => {
