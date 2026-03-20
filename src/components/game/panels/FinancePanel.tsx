@@ -11,10 +11,11 @@ interface FinancePanelProps {
     currentStats: any;
     lockedAllocations: string[];
     setLockedAllocations: React.Dispatch<React.SetStateAction<string[]>>;
+    onBudgetConfirmed?: () => void;
 }
 
-export const FinancePanel: React.FC<FinancePanelProps> = ({ 
-    gameState, setGameState, currentStats, lockedAllocations, setLockedAllocations 
+export const FinancePanel: React.FC<FinancePanelProps> = ({
+    gameState, setGameState, currentStats, lockedAllocations, setLockedAllocations, onBudgetConfirmed
 }) => {
     const [financeChartMode, setFinanceChartMode] = useState<'OVERVIEW' | 'EXPENSE_DETAIL'>('OVERVIEW');
     const [tempAllocationWeights, setTempAllocationWeights] = useState(gameState.financeSettings.allocationWeights);
@@ -64,13 +65,14 @@ export const FinancePanel: React.FC<FinancePanelProps> = ({
 
     const handleConfirmBudget = () => {
         setGameState(prev => ({
-            ...prev, 
+            ...prev,
             budgetConfirmed: true,
             financeSettings: {
-                ...prev.financeSettings, 
+                ...prev.financeSettings,
                 allocationWeights: tempAllocationWeights
             }
         }));
+        onBudgetConfirmed?.();
     };
 
     return (

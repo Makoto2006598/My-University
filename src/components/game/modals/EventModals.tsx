@@ -104,8 +104,11 @@ export const BudgetModal: React.FC<{ isOpen: boolean; onConfirm: () => void; }> 
             <div className="bg-white border border-stone-200 p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
                 <div className="w-16 h-16 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-200"><DollarSign className="w-8 h-8 text-white"/></div>
                 <h2 className="text-2xl font-bold text-stone-800 mb-2">新的月份开始了</h2>
-                <p className="text-stone-500 mb-6">请前往财务处审阅本月预算分配方案。<br/>确认后本月预算将锁定。</p>
-                <button onClick={onConfirm} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-colors shadow-lg">前往财务处</button>
+                <p className="text-stone-500 mb-4">请前往财务处审阅并确认本月预算分配方案。</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
+                    <p className="text-amber-700 text-sm font-bold">确认预算后才能继续推进时间</p>
+                </div>
+                <button onClick={onConfirm} className="w-full py-3 min-h-[48px] bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl transition-colors shadow-lg">前往财务处</button>
             </div>
         </div>
     );
