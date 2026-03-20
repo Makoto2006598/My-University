@@ -53,6 +53,7 @@ export interface CollegeDef {
   category: 'BASE' | 'NEW_ENG' | 'TRAD_ENG' | 'LIB_ARTS';
   dependency?: CollegeType; // Prerequisite college
   description: string;
+  requiredRank?: UniversityRank; // Minimum rank to unlock this college
 }
 
 export interface MajorDef {

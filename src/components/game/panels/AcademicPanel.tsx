@@ -1,7 +1,16 @@
 
 import React, { useState } from 'react';
-import { GameState, CollegeType, FacultyTitle, Faculty } from '../../../types';
+import { GameState, CollegeType, FacultyTitle, Faculty, UniversityRank } from '../../../types';
 import { COLLEGES_DEF, MAJORS_DEF } from '../../../data/gameData';
+
+const RANK_ORDER: UniversityRank[] = [
+    UniversityRank.STARTUP, UniversityRank.TIER_3, UniversityRank.TIER_2,
+    UniversityRank.TIER_1, UniversityRank.PROJECT_211, UniversityRank.PROJECT_985
+];
+const meetsRank = (current: UniversityRank, required?: UniversityRank) => {
+    if (!required) return true;
+    return RANK_ORDER.indexOf(current) >= RANK_ORDER.indexOf(required);
+};
 import { getDeanManagementAbility } from '../../../utils/gameUtils';
 import { BookOpen, GraduationCap, Medal, UserPlus, AlertCircle, Check, Lock, ChevronRight, Hammer, Settings, Users, School } from 'lucide-react';
 
@@ -18,6 +27,10 @@ export const AcademicPanel: React.FC<AcademicPanelProps> = ({ gameState, setGame
 
     const handleCreateCollege = (type: CollegeType) => {
         const def = COLLEGES_DEF[type];
+        if (def.requiredRank && !meetsRank(gameState.rank, def.requiredRank)) {
+            alert(`设立 ${def.name} 需要大学等级达到 ${def.requiredRank}！`);
+            return;
+        }
         if (def.dependency && !gameState.colleges.find(c => c.type === def.dependency)) {
             alert(`设立 ${def.name} 需要先设立 ${COLLEGES_DEF[def.dependency].name}！`);
             return;
@@ -83,18 +96,20 @@ export const AcademicPanel: React.FC<AcademicPanelProps> = ({ gameState, setGame
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {(Object.values(COLLEGES_DEF) as any[]).map((def: any) => {
                                     const exists = gameState.colleges.find(c => c.type === def.type);
-                                    const isLocked = def.dependency && !gameState.colleges.find(c => c.type === def.dependency);
-                                    
-                                    if (exists) return null; // Don't show already built
+                                    const depLocked = def.dependency && !gameState.colleges.find(c => c.type === def.dependency);
+                                    const rankLocked = def.requiredRank && !meetsRank(gameState.rank, def.requiredRank);
+                                    const isLocked = depLocked || rankLocked;
+
+                                    if (exists) return null;
 
                                     return (
                                         <button
                                             key={def.type}
                                             onClick={() => !isLocked && handleCreateCollege(def.type)}
                                             disabled={isLocked}
-                                            className={`p-4 rounded-xl border text-left transition-all relative group h-32 flex flex-col justify-between ${
-                                                isLocked 
-                                                ? 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed' 
+                                            className={`p-4 rounded-xl border text-left transition-all relative group h-36 flex flex-col justify-between ${
+                                                isLocked
+                                                ? 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
                                                 : 'bg-white border-orange-100 text-stone-600 hover:bg-orange-50 hover:border-indigo-400 hover:text-indigo-900 shadow-sm hover:shadow-md'
                                             }`}
                                         >
@@ -105,14 +120,21 @@ export const AcademicPanel: React.FC<AcademicPanelProps> = ({ gameState, setGame
                                                 </div>
                                                 <div className="text-xs opacity-70 leading-tight">{def.description}</div>
                                             </div>
-                                            {def.dependency && isLocked && (
-                                                <div className="text-[10px] text-red-600 mt-2 bg-red-50 px-2 py-1 rounded inline-block w-max">
-                                                    前置需求: {COLLEGES_DEF[def.dependency as CollegeType].name}
-                                                </div>
-                                            )}
-                                            {!isLocked && (
-                                                <div className="text-xs text-emerald-600 font-mono self-end">费用: 500K</div>
-                                            )}
+                                            <div className="space-y-1">
+                                                {rankLocked && (
+                                                    <div className="text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded inline-block w-max border border-amber-200">
+                                                        需要等级: {def.requiredRank}
+                                                    </div>
+                                                )}
+                                                {depLocked && (
+                                                    <div className="text-[10px] text-red-600 bg-red-50 px-2 py-1 rounded inline-block w-max">
+                                                        前置需求: {COLLEGES_DEF[def.dependency as CollegeType].name}
+                                                    </div>
+                                                )}
+                                                {!isLocked && (
+                                                    <div className="text-xs text-emerald-600 font-mono self-end">费用: 500K</div>
+                                                )}
+                                            </div>
                                         </button>
                                     );
                                 })}
