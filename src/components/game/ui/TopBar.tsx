@@ -2,10 +2,11 @@
 import React from 'react';
 import { GameState, GameSettings } from '../../../types';
 import { formatMoney } from '../../../utils/gameUtils';
-import { 
-    Edit3, DollarSign, Smile, Users, Briefcase, 
-    Pause, Play, FastForward, Zap, Save, Settings 
+import {
+    Edit3, DollarSign, Smile, Users, Briefcase,
+    Pause, Play, FastForward, Zap, Save, Settings, Lock
 } from 'lucide-react';
+import { getGameDate } from '../../../utils/gameUtils';
 
 interface TopBarProps {
     gameState: GameState;
@@ -30,6 +31,9 @@ export const TopBar: React.FC<TopBarProps> = ({
     onOpenSave,
     onOpenSettings
 }) => {
+    const date = getGameDate(gameState.day);
+    const budgetBlocked = date.date === 1 && !gameState.budgetConfirmed && gameState.day > 1;
+
     return (
         <div className="h-14 sm:h-16 bg-white/80 backdrop-blur border-b border-orange-100 flex items-center justify-between px-2 sm:px-4 shrink-0 z-20 shadow-sm">
             <div className="flex items-center gap-2 sm:gap-6 min-w-0">
@@ -65,8 +69,13 @@ export const TopBar: React.FC<TopBarProps> = ({
                 </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-3">
-                <div className="flex bg-stone-100 rounded-lg p-0.5 sm:p-1 border border-stone-200">
-                    {[0, 1, 5, 10].map(s => <button key={s} onClick={() => onSpeedChange(s)} className={`p-2 sm:p-1.5 rounded min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0 flex items-center justify-center ${gameSpeed === s ? 'bg-orange-500 text-white shadow' : 'text-stone-400 hover:text-stone-600'}`}>{s === 0 ? <Pause className="w-4 h-4"/> : s === 1 ? <Play className="w-4 h-4"/> : s === 5 ? <FastForward className="w-4 h-4"/> : <Zap className="w-4 h-4"/>}</button>)}
+                <div className="flex bg-stone-100 rounded-lg p-0.5 sm:p-1 border border-stone-200 relative group">
+                    {budgetBlocked && (
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 font-bold">
+                            请先确认预算
+                        </div>
+                    )}
+                    {[0, 1, 5, 10].map(s => <button key={s} onClick={() => onSpeedChange(s)} disabled={budgetBlocked && s > 0} className={`p-2 sm:p-1.5 rounded min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0 flex items-center justify-center ${gameSpeed === s ? 'bg-orange-500 text-white shadow' : budgetBlocked && s > 0 ? 'text-stone-300 cursor-not-allowed' : 'text-stone-400 hover:text-stone-600'}`}>{budgetBlocked && s > 0 ? <Lock className="w-3.5 h-3.5"/> : s === 0 ? <Pause className="w-4 h-4"/> : s === 1 ? <Play className="w-4 h-4"/> : s === 5 ? <FastForward className="w-4 h-4"/> : <Zap className="w-4 h-4"/>}</button>)}
                 </div>
                 <div className="text-right hidden sm:block">
                     <div className="text-xs text-orange-500 font-bold">{currentStats.isPrepPeriod ? '建校筹备期' : gameDate.semesterString}</div>

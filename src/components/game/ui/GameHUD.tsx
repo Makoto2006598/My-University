@@ -56,7 +56,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         <>
             {/* Building Selector (Floats above Dock when 'BUILD' is active) */}
             {activeSidebarTab === 'BUILD' && isMenuExpanded && (
-                <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center animate-in slide-in-from-bottom-5 fade-in duration-300">
+                <div className="absolute bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center animate-in slide-in-from-bottom-5 fade-in duration-300">
                     <div className="bg-white/90 backdrop-blur-md border border-orange-200 rounded-2xl p-3 shadow-2xl max-w-[90vw] custom-scrollbar">
                         <div className="flex items-center gap-2 overflow-x-auto">
                             {BUILDING_CATEGORIES.map((cat, catIdx) => (

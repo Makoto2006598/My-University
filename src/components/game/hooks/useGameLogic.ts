@@ -56,9 +56,8 @@ export const useGameLogic = (
                 const currentDate = getGameDate(prev.day);
                 let newBudgetConfirmed = prev.budgetConfirmed;
                 
-                // Monthly Budget Logic: reset on 1st of each month, auto-confirm on 2nd
+                // Monthly Budget Logic: reset on 1st of each month, require manual confirmation
                 if (currentDate.date === 1 && prev.day > 1) newBudgetConfirmed = false;
-                if (currentDate.date === 2) newBudgetConfirmed = true;
 
                 // Admissions Logic
                 let newAdmissionsPhase = prev.admissionsPhase;
@@ -204,8 +203,9 @@ export const useGameLogic = (
     const handleSpeedChange = useCallback((speed: number) => {
         if (speed > 0) {
             const date = getGameDate(gameState.day);
-            if (date.date === 1 && !gameState.budgetConfirmed) {
-                // Prevent unpausing if budget not confirmed on day 1
+            if (date.date === 1 && !gameState.budgetConfirmed && gameState.day > 1) {
+                // Block unpausing until budget is confirmed
+                return;
             }
             setPreviousSpeed(speed);
             previousSpeedRef.current = speed;

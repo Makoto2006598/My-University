@@ -463,7 +463,7 @@ export const CampusPlanner: React.FC = () => {
             onSpeedChange={handlers.handleSpeedChange} onOpenSave={() => setShowSaveLoadModal(true)} onOpenSettings={() => setShowSettingsModal(true)}
         />
         
-        <div className="absolute inset-0 top-16 pb-0 z-0">
+        <div className="absolute inset-0 top-14 sm:top-16 pb-0 z-0">
             {/* Memoized GameViewport using grid prop for optimization */}
             <GameViewport 
                 grid={gameState.grid} 
@@ -504,16 +504,16 @@ export const CampusPlanner: React.FC = () => {
         />
 
         {activeSidebarTab && activeSidebarTab !== 'BUILD' && (
-            <div className="absolute inset-0 top-16 bottom-0 bg-orange-50/95 z-20 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute inset-0 top-14 sm:top-16 bottom-0 bg-orange-50/95 z-20 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center p-6 border-b border-orange-100 bg-white/50">
                     <h2 className="text-2xl font-bold text-stone-800 tracking-tight flex items-center gap-3">
                         {/* Map localized name or default */}
                         {activeSidebarTab === 'OVERVIEW' ? '概况' : activeSidebarTab === 'FINANCE' ? '财务处' : activeSidebarTab === 'PUBLICITY' ? '宣传处' : activeSidebarTab === 'LIAISON' ? '教育部联络处' : activeSidebarTab}
                     </h2>
-                    <button onClick={() => setActiveSidebarTab(null)} className="p-2 rounded-full hover:bg-stone-200 text-stone-400 hover:text-stone-600"><X className="w-6 h-6"/></button>
+                    <button onClick={() => setActiveSidebarTab(null)} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-stone-200 active:bg-stone-300 text-stone-400 hover:text-stone-600"><X className="w-6 h-6"/></button>
                 </div>
                 <div className="flex-1 overflow-hidden relative">
-                    {activeSidebarTab === 'FINANCE' && <FinancePanel gameState={gameState} setGameState={setGameState} currentStats={currentStats} lockedAllocations={lockedAllocations} setLockedAllocations={setLockedAllocations} />}
+                    {activeSidebarTab === 'FINANCE' && <FinancePanel gameState={gameState} setGameState={setGameState} currentStats={currentStats} lockedAllocations={lockedAllocations} setLockedAllocations={setLockedAllocations} onBudgetConfirmed={() => { handlers.handleSpeedChange(previousSpeed || 1); }} />}
                     {activeSidebarTab === 'ACADEMIC' && <AcademicPanel gameState={gameState} setGameState={setGameState} onAssignDean={(cid, role) => { setSelectedCollegeIdForDean(cid); setSelectedDeanRole(role); setShowFacultySelectModal(true); }} />}
                     {activeSidebarTab === 'HR' && <HRPanel gameState={gameState} onFire={(fid) => setGameState(p=>({...p, faculty: p.faculty.filter(f=>f.id!==fid)}))} onOpenRecruit={(m) => { setSelectedRecruitMethod(m); setRecruitmentConfigOpen(true); }} />}
                     {activeSidebarTab === 'ADMISSIONS' && <AdmissionsPanel gameState={gameState} setGameState={setGameState} onOpenPlanner={() => { setShowAdmissionPlannerModal(true); }} />}
