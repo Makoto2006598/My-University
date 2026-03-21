@@ -8,8 +8,6 @@ let package = Package(
         .iOS(.v16),
     ],
     products: [
-        // Swift Playgrounds 4 requires .iOSApplication product to recognize
-        // this package as a runnable App (not just a library/playground).
         .iOSApplication(
             name: "MyUniversity",
             targets: ["MyUniversity"],
@@ -28,10 +26,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "MyUniversity",
-            path: ".",
-            resources: [
-                .copy("Resources/web"),
-            ]
+            path: "."
         ),
     ]
 )
