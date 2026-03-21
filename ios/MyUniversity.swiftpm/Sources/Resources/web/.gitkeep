@@ -1,0 +1,2 @@
+# This directory will be populated by running: ./scripts/build-ios.sh
+# It contains the compiled web game assets served to WKWebView.
