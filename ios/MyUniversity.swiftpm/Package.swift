@@ -14,13 +14,13 @@ let package = Package(
             bundleIdentifier: "com.myuniversity.campusplanner",
             displayVersion: "1.0",
             bundleVersion: "1",
-            appCategory: .games,
             supportedDeviceFamilies: [.pad, .phone],
             supportedInterfaceOrientations: [
                 .portrait,
                 .landscapeLeft,
                 .landscapeRight,
-            ]
+            ],
+            appCategory: .games
         ),
     ],
     targets: [
