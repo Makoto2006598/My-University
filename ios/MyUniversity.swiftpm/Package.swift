@@ -1,18 +1,17 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 5.5
 import PackageDescription
 
 let package = Package(
     name: "MyUniversity",
     platforms: [
-        .iOS(.v16),
+        .iOS(.v15),
     ],
     targets: [
         .executableTarget(
             name: "MyUniversity",
-            path: "Sources",
+            // Swift Playgrounds 4 requires sources at the package root (path: ".")
+            path: ".",
             resources: [
-                // Copy the entire web/ directory (built by scripts/build-ios.sh)
-                // into the app bundle so WKWebView can load it locally.
                 .copy("Resources/web"),
             ]
         ),
