@@ -32,10 +32,25 @@ final class GameURLSchemeHandler: NSObject, WKURLSchemeHandler {
 
         let fileURL = webRoot.appendingPathComponent(relativePath.isEmpty ? "index.html" : relativePath)
 
-        // Serve the file, or fall back to index.html for SPA client-side routing.
-        let targetURL = FileManager.default.fileExists(atPath: fileURL.path)
-            ? fileURL
-            : webRoot.appendingPathComponent("index.html")
+        // Serve the file, or fall back to index.html only for HTML navigation
+        // (SPA client-side routing). Never fall back for asset requests (.js,
+        // .css, .png, etc.) – those should 404 cleanly rather than returning
+        // HTML, which would corrupt the resource.
+        let isAssetRequest = !fileURL.pathExtension.isEmpty && fileURL.pathExtension != "html"
+        let targetURL: URL
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            targetURL = fileURL
+        } else if isAssetRequest {
+            // Return 404 for missing assets.
+            let response = HTTPURLResponse(url: requestURL, statusCode: 404,
+                                           httpVersion: "HTTP/1.1", headerFields: nil)!
+            urlSchemeTask.didReceive(response)
+            urlSchemeTask.didReceive(Data())
+            urlSchemeTask.didFinish()
+            return
+        } else {
+            targetURL = webRoot.appendingPathComponent("index.html")
+        }
 
         do {
             let data = try Data(contentsOf: targetURL)
