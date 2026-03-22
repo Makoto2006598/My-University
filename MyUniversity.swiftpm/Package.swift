@@ -1,5 +1,6 @@
 // swift-tools-version: 5.8
 import PackageDescription
+import AppleProductTypes
 
 let package = Package(
     name: "MyUniversity",
@@ -11,7 +12,6 @@ let package = Package(
             name: "MyUniversity",
             targets: ["AppModule"],
             bundleIdentifier: "com.myuniversity.game",
-            teamIdentifier: "",
             displayVersion: "1.0",
             bundleVersion: "1",
             appIcon: .placeholder(icon: .book),
