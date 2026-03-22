@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SidePanelView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     let tab: SidebarTab
 
     var body: some View {
@@ -63,7 +63,7 @@ struct SidePanelView: View {
 
 // MARK: - Overview Panel
 struct OverviewPanelContent: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
 
     var body: some View {
         let stats = viewModel.currentStats
@@ -132,7 +132,7 @@ struct OverviewPanelContent: View {
 
 // MARK: - Academic Panel
 struct AcademicPanelContent: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     @State private var showAddCollege = false
 
     var body: some View {
@@ -231,7 +231,7 @@ struct AcademicPanelContent: View {
 
 // MARK: - HR Panel
 struct HRPanelContent: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     @State private var showRecruit = false
     @State private var recruitDept: CollegeType = .arts
     @State private var recruitMethod: RecruitmentMethod = .social
@@ -333,7 +333,7 @@ struct HRPanelContent: View {
 
 // MARK: - Finance Panel
 struct FinancePanelContent: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
 
     var body: some View {
         let stats = viewModel.currentStats
@@ -432,7 +432,7 @@ struct FinancePanelContent: View {
 
 // MARK: - Admissions Panel
 struct AdmissionsPanelContent: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -515,7 +515,7 @@ struct AdmissionsPanelContent: View {
 
 // MARK: - Publicity Panel
 struct PublicityPanelContent: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -590,7 +590,7 @@ struct PublicityPanelContent: View {
 
 // MARK: - Liaison Panel
 struct LiaisonPanelContent: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct GameView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     var onExit: () -> Void
     @State private var showSaveLoad = false
     @State private var showSettings = false
@@ -50,7 +50,7 @@ struct GameView: View {
 
 // MARK: - Top Bar
 struct TopBarView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     var onSave: () -> Void
     var onExit: () -> Void
 

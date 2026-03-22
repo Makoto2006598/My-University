@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SaveLoadView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     @Environment(\.dismiss) var dismiss
     @State private var slots: [SaveSlotInfo?] = [nil, nil, nil]
     @State private var showDeleteConfirm = false

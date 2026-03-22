@@ -1,33 +1,36 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 5.8
 import PackageDescription
 
 let package = Package(
     name: "MyUniversity",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14)
+        .iOS("16.0")
     ],
     products: [
         .iOSApplication(
             name: "MyUniversity",
-            targets: ["MyUniversity"],
+            targets: ["AppModule"],
             bundleIdentifier: "com.myuniversity.game",
             teamIdentifier: "",
             displayVersion: "1.0",
             bundleVersion: "1",
-            appIcon: .placeholder(icon: .graduationCap),
+            appIcon: .placeholder(icon: .book),
             accentColor: .presetColor(.blue),
-            supportedDeviceFamilies: [.pad, .phone],
-            supportedInterfaceOrientations: [
-                .landscapeRight,
-                .landscapeLeft
+            supportedDeviceFamilies: [
+                .pad,
+                .phone
             ],
-            appCategory: .games
+            supportedInterfaceOrientations: [
+                .portrait,
+                .landscapeRight,
+                .landscapeLeft,
+                .portraitUpsideDown(.when(deviceFamilies: [.pad]))
+            ]
         )
     ],
     targets: [
         .executableTarget(
-            name: "MyUniversity",
+            name: "AppModule",
             path: "Sources"
         )
     ]

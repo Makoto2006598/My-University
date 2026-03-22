@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CampusGridView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     @State private var offset: CGSize = .zero
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
@@ -237,7 +237,7 @@ struct CampusGridView: View {
 
 // MARK: - Building Inspector
 struct BuildingInspectorView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     let origin: (x: Int, y: Int)
 
     var body: some View {

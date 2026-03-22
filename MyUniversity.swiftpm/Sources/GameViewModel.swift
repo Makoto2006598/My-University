@@ -1,23 +1,22 @@
 import SwiftUI
 import Combine
 
-@Observable
-class GameViewModel {
-    var gameState: GameState
-    var gameSpeed: Int = 1
-    var previousSpeed: Int = 1
+class GameViewModel: ObservableObject {
+    @Published var gameState: GameState
+    @Published var gameSpeed: Int = 1
+    @Published var previousSpeed: Int = 1
 
     // UI State
-    var selectedTab: SidebarTab? = nil
-    var selectedBuildingType: BuildingType? = nil
-    var selectedVariantIndex: Int = 0
-    var isRotated: Bool = false
-    var selectedCellOrigin: (x: Int, y: Int)? = nil
-    var showBudgetAlert: Bool = false
-    var alertMessage: String = ""
-    var showAlert: Bool = false
-    var currentSlot: Int? = nil
-    var showServiceOverlay: Bool = false
+    @Published var selectedTab: SidebarTab? = nil
+    @Published var selectedBuildingType: BuildingType? = nil
+    @Published var selectedVariantIndex: Int = 0
+    @Published var isRotated: Bool = false
+    @Published var selectedCellOrigin: (x: Int, y: Int)? = nil
+    @Published var showBudgetAlert: Bool = false
+    @Published var alertMessage: String = ""
+    @Published var showAlert: Bool = false
+    @Published var currentSlot: Int? = nil
+    @Published var showServiceOverlay: Bool = false
 
     private var gameTimer: Timer?
     private let setupName: String
@@ -29,7 +28,6 @@ class GameViewModel {
         self.setupType1 = type1
         self.setupType2 = type2
 
-        // Initialize mission states
         var initialMissions: [String: MissionStatus] = [:]
         for key in MISSIONS_DEF.keys {
             initialMissions[key] = key.hasPrefix("root") ? .available : .locked
@@ -53,7 +51,9 @@ class GameViewModel {
         guard gameSpeed > 0 else { return }
         let interval = 8.0 / Double(gameSpeed)
         gameTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.tick()
+            DispatchQueue.main.async {
+                self?.tick()
+            }
         }
     }
 
@@ -80,12 +80,10 @@ class GameViewModel {
         let currentDate = getGameDate(gameState.day)
         var newBudgetConfirmed = gameState.budgetConfirmed
 
-        // Monthly budget reset
         if currentDate.date == 1 && gameState.day > 1 {
             newBudgetConfirmed = false
         }
 
-        // Block game on 1st if budget not confirmed
         if currentDate.date == 1 && !newBudgetConfirmed && gameState.day > 1 {
             gameState.budgetConfirmed = false
             showBudgetAlert = true
@@ -93,7 +91,6 @@ class GameViewModel {
             return
         }
 
-        // Admissions Phase
         var newAdmissionsPhase = gameState.admissionsPhase
         var newIncoming = gameState.incomingStudents
 
@@ -122,14 +119,12 @@ class GameViewModel {
             newAdmissionsPhase = .idle
         }
 
-        // Enroll students on Sep 1
         if currentDate.month == 9 && currentDate.date == 1 && !newIncoming.isEmpty {
             gameState.studentList.append(contentsOf: newIncoming)
             gameState.students += newIncoming.count
             newIncoming = []
         }
 
-        // Publicity
         var activeBuffs = gameState.publicity.activeBuffs.map { ActiveBuff(type: $0.type, daysLeft: $0.daysLeft - 1) }.filter { $0.daysLeft > 0 }
         let hasOverPublicity = activeBuffs.contains { $0.type == .overPublicity }
         let hasBackroom = activeBuffs.contains { $0.type == .backroomDeal }
@@ -153,7 +148,6 @@ class GameViewModel {
             }
         }
 
-        // Liaison grants
         var liaisonGrant: Double = 0
         var newGrantDaysLeft = gameState.liaison.grantDaysLeft
         if newGrantDaysLeft > 0 {
@@ -161,7 +155,6 @@ class GameViewModel {
             newGrantDaysLeft -= 1
         }
 
-        // Cooldowns
         var newCooldowns = gameState.liaison.cooldowns
         var newMissionStatuses = gameState.liaison.missions
         for (id, day) in newCooldowns {
@@ -171,15 +164,12 @@ class GameViewModel {
             }
         }
 
-        // Construction progress
         var anyCompleted = false
-        var gridChanged = false
         var newGrid = gameState.grid
 
         for y in 0..<GRID_SIZE {
             for x in 0..<GRID_SIZE {
                 if newGrid[y][x].constructionStatus == .constructing, let left = newGrid[y][x].constructionLeft {
-                    gridChanged = true
                     let newLeft = left - 1
                     if newLeft <= 0 {
                         anyCompleted = true
@@ -196,12 +186,10 @@ class GameViewModel {
             updateFullGrid(&newGrid)
         }
 
-        // Calculate stats
         let stats = calculateStats(grid: newGrid, currentStudents: gameState.students, currentHappiness: gameState.happiness, gameState: gameState)
         let netIncome = stats.netIncome - dailyPublicityCost + liaisonGrant
         let totalMinistryRec = stats.ministryRecognition + gameState.publicity.ministryBonus
 
-        // Finance history
         let historyPoint = FinanceHistoryPoint(
             day: gameState.day,
             totalMoney: gameState.money + netIncome,
@@ -218,7 +206,6 @@ class GameViewModel {
             liaisonIncome: liaisonGrant
         )
 
-        // Faculty satisfaction & resignation
         let baseFacSat = stats.facultySatisfaction
         var resignedIds: [String] = []
         var updatedFaculty = gameState.faculty.map { f -> Faculty in
@@ -246,7 +233,6 @@ class GameViewModel {
         }
         updatedFaculty.removeAll { resignedIds.contains($0.id) }
 
-        // Update state
         gameState.day += 1
         gameState.money += netIncome
         gameState.happiness = stats.happiness.rounded()
@@ -263,14 +249,12 @@ class GameViewModel {
         gameState.liaison.cooldowns = newCooldowns
         gameState.liaison.grantDaysLeft = newGrantDaysLeft
 
-        // Update scale & rank
         gameState.scale = calculateScale(gameState.students, 1)
         let rankResult = calculateRank(gameState)
         gameState.rank = rankResult.rank
         gameState.studentCap = rankResult.cap
         gameState.universityLabel = getUniversityLabel(gameState.colleges)
 
-        // Append history
         gameState.financeHistory.append(historyPoint)
         if gameState.financeHistory.count > 60 {
             gameState.financeHistory = Array(gameState.financeHistory.suffix(60))
@@ -287,23 +271,16 @@ class GameViewModel {
         if isRotated { swap(&width, &height) }
         let cost = variant?.cost ?? (BUILDINGS[tool]?.cost ?? 0)
 
-        guard gameState.money >= cost else {
-            showAlertMsg("资金不足！")
-            return
-        }
+        guard gameState.money >= cost else { showAlertMsg("资金不足！"); return }
         guard x + width <= GRID_SIZE && y + height <= GRID_SIZE else { return }
 
         let def = BUILDINGS[tool]!
         let needsRoad = def.requiresRoadConnection && tool != .road && tool != .cityRoad
         if needsRoad && tool != .schoolGate {
             let check = RoadNetwork.checkConnectedRoadAdjacency(gameState.grid, x: x, y: y, width: width, height: height)
-            if !check.valid {
-                showAlertMsg(check.reason ?? "建筑必须连接道路！")
-                return
-            }
+            if !check.valid { showAlertMsg(check.reason ?? "建筑必须连接道路！"); return }
         }
 
-        // Check occupied
         for dy in 0..<height {
             for dx in 0..<width {
                 let cell = gameState.grid[y + dy][x + dx]
@@ -334,10 +311,7 @@ class GameViewModel {
         let costPerCell = variant?.cost ?? (BUILDINGS[.road]?.cost ?? 5000)
         let totalCost = costPerCell * Double(path.count)
 
-        guard gameState.money >= totalCost else {
-            showAlertMsg("资金不足！")
-            return
-        }
+        guard gameState.money >= totalCost else { showAlertMsg("资金不足！"); return }
 
         for (px, py) in path {
             let current = gameState.grid[py][px]
@@ -381,15 +355,11 @@ class GameViewModel {
     func addCollege(type: CollegeType) {
         guard COLLEGES_DEF[type] != nil else { return }
         guard !gameState.colleges.contains(where: { $0.type == type }) else { return }
-
-        // Check dependency
         if let dep = COLLEGES_DEF[type]?.dependency {
             guard gameState.colleges.contains(where: { $0.type == dep }) else {
-                showAlertMsg("需要先建立前置学院！")
-                return
+                showAlertMsg("需要先建立前置学院！"); return
             }
         }
-
         let college = ActiveCollege(
             id: generateId(), type: type,
             activeMajors: MAJORS_DEF.filter { $0.collegeType == type }.map { $0.id },
@@ -411,56 +381,38 @@ class GameViewModel {
     // MARK: - HR Actions
     func recruitFaculty(method: RecruitmentMethod, department: CollegeType) {
         let cost = method.cost
-        guard gameState.money >= cost else {
-            showAlertMsg("资金不足！")
-            return
-        }
+        guard gameState.money >= cost else { showAlertMsg("资金不足！"); return }
 
         let titlePool: [(FacultyTitle, Double)]
         switch method {
-        case .ministry:
-            titlePool = [(.ta, 0.6), (.lecturer, 0.3), (.assocProf, 0.1)]
-        case .social:
-            titlePool = [(.ta, 0.3), (.lecturer, 0.4), (.assocProf, 0.2), (.prof, 0.1)]
-        case .headhunterLow:
-            titlePool = [(.lecturer, 0.3), (.assocProf, 0.4), (.prof, 0.3)]
-        case .headhunterMid:
-            titlePool = [(.assocProf, 0.3), (.prof, 0.5), (.academician, 0.2)]
-        case .headhunterHigh:
-            titlePool = [(.prof, 0.4), (.academician, 0.6)]
+        case .ministry: titlePool = [(.ta, 0.6), (.lecturer, 0.3), (.assocProf, 0.1)]
+        case .social: titlePool = [(.ta, 0.3), (.lecturer, 0.4), (.assocProf, 0.2), (.prof, 0.1)]
+        case .headhunterLow: titlePool = [(.lecturer, 0.3), (.assocProf, 0.4), (.prof, 0.3)]
+        case .headhunterMid: titlePool = [(.assocProf, 0.3), (.prof, 0.5), (.academician, 0.2)]
+        case .headhunterHigh: titlePool = [(.prof, 0.4), (.academician, 0.6)]
         }
 
         var roll = Double.random(in: 0...1)
         var selectedTitle: FacultyTitle = .ta
         for (title, prob) in titlePool {
             roll -= prob
-            if roll <= 0 {
-                selectedTitle = title
-                break
-            }
+            if roll <= 0 { selectedTitle = title; break }
         }
 
         let salary = selectedTitle.expectedSalary * Double.random(in: 0.8...1.2)
-        let research = Double.random(in: 20...100)
-        let management = Double.random(in: 20...100)
-
         let faculty = Faculty(
             id: generateId(), name: generateName(),
-            title: selectedTitle, salary: salary,
-            department: department,
-            researchAbility: research,
-            managementAbility: management,
-            hireDate: gameState.day,
-            satisfaction: 70
+            title: selectedTitle, salary: salary, department: department,
+            researchAbility: Double.random(in: 20...100),
+            managementAbility: Double.random(in: 20...100),
+            hireDate: gameState.day, satisfaction: 70
         )
-
         gameState.faculty.append(faculty)
         gameState.money -= cost
     }
 
     func fireFaculty(id: String) {
         gameState.faculty.removeAll { $0.id == id }
-        // Remove from dean/vice dean positions
         for i in 0..<gameState.colleges.count {
             if gameState.colleges[i].deanId == id { gameState.colleges[i].deanId = nil }
             if gameState.colleges[i].viceDeanId == id { gameState.colleges[i].viceDeanId = nil }
@@ -471,53 +423,36 @@ class GameViewModel {
     func confirmBudget() {
         gameState.budgetConfirmed = true
         showBudgetAlert = false
-        if gameSpeed == 0 {
-            setSpeed(previousSpeed)
-        }
+        if gameSpeed == 0 { setSpeed(previousSpeed) }
     }
 
     // MARK: - Publicity
     func startSocialCampaign(_ tier: SocialPublicityTier) {
         let hasOver = gameState.publicity.activeBuffs.contains { $0.type == .overPublicity }
         if hasOver || !gameState.publicity.activeCampaigns.isEmpty {
-            showAlertMsg("当前无法开始宣传活动")
-            return
+            showAlertMsg("当前无法开始宣传活动"); return
         }
-
         let newCampaign = ActiveCampaign(tier: tier, daysLeft: tier.duration)
         let hasRecent = gameState.publicity.activeBuffs.contains { $0.type == .recentPublicity }
-
         if hasRecent {
             gameState.publicity.activeBuffs.append(ActiveBuff(type: .overPublicity, daysLeft: 90))
         } else {
             gameState.publicity.activeBuffs.append(ActiveBuff(type: .recentPublicity, daysLeft: 180))
         }
-
         gameState.publicity.activeCampaigns = [newCampaign]
     }
 
     func startMinistryCampaign() {
         let cost: Double = 5_000_000
-        guard gameState.money >= cost else {
-            showAlertMsg("资金不足 (需要 5M)")
-            return
-        }
-
+        guard gameState.money >= cost else { showAlertMsg("资金不足 (需要 5M)"); return }
         let hasOver = gameState.publicity.activeBuffs.contains { $0.type == .overPublicity }
-        if hasOver {
-            showAlertMsg("处于过度宣传状态，无法公关")
-            return
-        }
+        if hasOver { showAlertMsg("处于过度宣传状态，无法公关"); return }
 
         let stats = calculateStats(grid: gameState.grid, currentStudents: gameState.students, currentHappiness: gameState.happiness, gameState: gameState)
-        let facSat = stats.facultySatisfaction
-
         let gainBase = 10 + Double.random(in: 0...40)
-        var gain = gainBase * (0.5 + 0.5 * (facSat / 100))
-
+        var gain = gainBase * (0.5 + 0.5 * (stats.facultySatisfaction / 100))
         let hasRecent = gameState.publicity.activeBuffs.contains { $0.type == .recentPublicity }
         let hasBackroom = gameState.publicity.activeBuffs.contains { $0.type == .backroomDeal }
-
         if hasRecent { gain *= 0.9 }
         if hasOver { gain *= 0.7 }
         if hasBackroom { gain *= 0.2 }
@@ -528,29 +463,21 @@ class GameViewModel {
         } else {
             gameState.publicity.activeBuffs.append(ActiveBuff(type: .ministryContact, daysLeft: 180))
         }
-
         gameState.money -= cost
         gameState.ministryRecognition += gain
         gameState.publicity.ministryBonus += gain
     }
 
-    // MARK: - Liaison / Missions
+    // MARK: - Liaison
     func acceptMission(_ id: String) {
-        guard gameState.liaison.activeMissions.count < 3 else {
-            showAlertMsg("任务已满")
-            return
-        }
-
+        guard gameState.liaison.activeMissions.count < 3 else { showAlertMsg("任务已满"); return }
         guard let def = MISSIONS_DEF[id] else { return }
         let activeIds = gameState.liaison.activeMissions.map { $0.id }
-
         if !def.exclusiveWith.isEmpty {
             if let conflict = def.exclusiveWith.first(where: { activeIds.contains($0) }) {
-                showAlertMsg("互斥任务冲突：\(MISSIONS_DEF[conflict]?.title ?? conflict)")
-                return
+                showAlertMsg("互斥任务冲突：\(MISSIONS_DEF[conflict]?.title ?? conflict)"); return
             }
         }
-
         gameState.liaison.missions[id] = .active
         gameState.liaison.activeMissions.append(ActiveMission(id: id, acceptedDay: gameState.day))
     }
@@ -562,95 +489,59 @@ class GameViewModel {
     }
 
     func claimMission(_ id: String) {
-        guard checkMissionRequirements(id) else {
-            showAlertMsg("未满足任务完成条件！")
-            return
-        }
-
+        guard checkMissionRequirements(id) else { showAlertMsg("未满足任务完成条件！"); return }
         guard let def = MISSIONS_DEF[id] else { return }
         gameState.liaison.missions[id] = .completed
-
-        if !def.exclusiveWith.isEmpty {
-            for exId in def.exclusiveWith {
-                gameState.liaison.missions[exId] = .locked
-            }
-        }
-
-        if let unlocks = def.rewards.unlocks {
-            for unId in unlocks {
-                gameState.liaison.missions[unId] = .available
-            }
-        }
-
-        if let title = def.rewards.title {
-            gameState.universityLabel = title
-        }
-        if let soc = def.rewards.socialRec {
-            gameState.socialRecognition += soc
-        }
-        if let min = def.rewards.ministryRec {
-            gameState.ministryRecognition += min
-            gameState.publicity.ministryBonus += min
+        for exId in def.exclusiveWith { gameState.liaison.missions[exId] = .locked }
+        if let unlocks = def.rewards.unlocks { for unId in unlocks { gameState.liaison.missions[unId] = .available } }
+        if let title = def.rewards.title { gameState.universityLabel = title }
+        if let soc = def.rewards.socialRec { gameState.socialRecognition += soc }
+        if let minRec = def.rewards.ministryRec {
+            gameState.ministryRecognition += minRec
+            gameState.publicity.ministryBonus += minRec
         }
         if let grant = def.rewards.grant {
             gameState.liaison.grantDailyAmount += grant.amount
             gameState.liaison.grantDaysLeft += grant.days
         }
-
         gameState.liaison.activeMissions.removeAll { $0.id == id }
     }
 
     func checkMissionRequirements(_ id: String) -> Bool {
         guard let def = MISSIONS_DEF[id] else { return false }
         let req = def.requirements
-
         if let colleges = req.colleges {
             for cType in colleges {
                 if !gameState.colleges.contains(where: { $0.type == cType }) { return false }
             }
         }
-
         if let categories = req.categories {
             for cat in categories {
-                let found = gameState.colleges.contains { c in
-                    COLLEGES_DEF[c.type]?.category.rawValue == cat
-                }
-                if !found { return false }
+                if !gameState.colleges.contains(where: { COLLEGES_DEF[$0.type]?.category.rawValue == cat }) { return false }
             }
         }
-
         if req.needDean {
             var requiredColleges = Set<CollegeType>()
-            if let cols = req.colleges { cols.forEach { requiredColleges.insert($0) } }
+            req.colleges?.forEach { requiredColleges.insert($0) }
             if let cats = req.categories {
                 for c in gameState.colleges {
-                    if let def = COLLEGES_DEF[c.type], cats.contains(def.category.rawValue) {
-                        requiredColleges.insert(c.type)
-                    }
+                    if let d = COLLEGES_DEF[c.type], cats.contains(d.category.rawValue) { requiredColleges.insert(c.type) }
                 }
             }
             for cType in requiredColleges {
-                if let col = gameState.colleges.first(where: { $0.type == cType }), col.deanId == nil {
-                    return false
-                }
+                if let col = gameState.colleges.first(where: { $0.type == cType }), col.deanId == nil { return false }
             }
         }
-
         if let buildReq = req.minBuildingsPerCollege {
-            var reqCount = (req.colleges?.count ?? 0)
-            if let cats = req.categories { reqCount += cats.count }
-
+            var reqCount = (req.colleges?.count ?? 0) + (req.categories?.count ?? 0)
             var count = 0
             for row in gameState.grid {
                 for cell in row {
-                    if cell.building == buildReq.type && cell.isOrigin && cell.constructionStatus == .completed {
-                        count += 1
-                    }
+                    if cell.building == buildReq.type && cell.isOrigin && cell.constructionStatus == .completed { count += 1 }
                 }
             }
             if count < reqCount * buildReq.count { return false }
         }
-
         return true
     }
 
@@ -668,22 +559,12 @@ class GameViewModel {
     }
 
     // MARK: - Helpers
-    func showAlertMsg(_ msg: String) {
-        alertMessage = msg
-        showAlert = true
-    }
-
-    func getBuildingAt(_ x: Int, _ y: Int) -> CellData? {
-        guard x >= 0, x < GRID_SIZE, y >= 0, y < GRID_SIZE else { return nil }
-        return gameState.grid[y][x]
-    }
+    func showAlertMsg(_ msg: String) { alertMessage = msg; showAlert = true }
 
     func findBuildingOrigin(_ buildingId: String) -> (x: Int, y: Int)? {
         for y in 0..<GRID_SIZE {
             for x in 0..<GRID_SIZE {
-                if gameState.grid[y][x].buildingId == buildingId && gameState.grid[y][x].isOrigin {
-                    return (x, y)
-                }
+                if gameState.grid[y][x].buildingId == buildingId && gameState.grid[y][x].isOrigin { return (x, y) }
             }
         }
         return nil

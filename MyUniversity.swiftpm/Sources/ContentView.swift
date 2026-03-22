@@ -8,7 +8,7 @@ enum AppScreen {
 
 struct ContentView: View {
     @State private var screen: AppScreen = .mainMenu
-    @State private var viewModel: GameViewModel?
+    @StateObject private var viewModelHolder = ViewModelHolder()
     @State private var setupName = ""
     @State private var setupType1: UniType1 = .publicUni
     @State private var setupType2: UniType2 = .research
@@ -24,12 +24,11 @@ struct ContentView: View {
                     onLoadGame: { slot in
                         let vm = GameViewModel(name: "", type1: .publicUni, type2: .research)
                         if vm.loadGame(slot: slot) {
-                            viewModel = vm
+                            viewModelHolder.viewModel = vm
                             screen = .game
                         }
                     }
                 )
-                .transition(.opacity)
 
             case .setup:
                 SetupView(
@@ -37,27 +36,30 @@ struct ContentView: View {
                     type1: $setupType1,
                     type2: $setupType2,
                     onStart: {
+                        if setupName.isEmpty { setupName = "新建大学" }
                         let vm = GameViewModel(name: setupName, type1: setupType1, type2: setupType2)
-                        viewModel = vm
+                        viewModelHolder.viewModel = vm
                         screen = .game
                     },
                     onBack: { screen = .mainMenu }
                 )
-                .transition(.opacity)
 
             case .game:
-                if let vm = viewModel {
+                if let vm = viewModelHolder.viewModel {
                     GameView(viewModel: vm, onExit: {
                         vm.stopGameLoop()
-                        viewModel = nil
+                        viewModelHolder.viewModel = nil
                         screen = .mainMenu
                     })
-                    .transition(.opacity)
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: screen == .mainMenu)
+        .preferredColorScheme(.dark)
     }
+}
+
+class ViewModelHolder: ObservableObject {
+    @Published var viewModel: GameViewModel?
 }
 
 // MARK: - Main Menu
@@ -93,7 +95,6 @@ struct MainMenuView: View {
                     .cornerRadius(16)
             }
 
-            // Load slots
             VStack(spacing: 12) {
                 ForEach(0..<3, id: \.self) { i in
                     if let info = slots[i] {
@@ -214,15 +215,12 @@ struct SetupView: View {
 
             Spacer()
 
-            Button(action: {
-                if name.isEmpty { name = "新建大学" }
-                onStart()
-            }) {
-                Text("开始建设 🏗️")
+            Button(action: onStart) {
+                Text("开始建设")
                     .font(.title2.bold())
                     .frame(maxWidth: 300)
                     .padding()
-                    .background(name.isEmpty ? Color.gray : Color.blue)
+                    .background(Color.blue)
                     .foregroundColor(.white)
                     .cornerRadius(16)
             }

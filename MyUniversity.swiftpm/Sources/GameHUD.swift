@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct GameHUD: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -142,7 +142,7 @@ struct GameHUD: View {
 
 // MARK: - Build Panel (shown in side panel when build tab is selected but no tool chosen)
 struct BuildPanelView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
 
     private let buildableTypes: [BuildingType] = [
         .road, .schoolGate, .dormitory, .lectureHall,
