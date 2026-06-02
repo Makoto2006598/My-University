@@ -49,10 +49,23 @@ export const CampusPlanner: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(0); 
   const [appSettings, setAppSettings] = useState<GameSettings>({ musicVolume: 0.5, sfxVolume: 0.5, brightness: 1.0, cameraPanSensitivity: 1.0, cameraZoomSensitivity: 1.0 });
 
+  // Notification toast state
+  const [notification, setNotification] = useState<{ message: string; type: 'error' | 'info' | 'success' } | null>(null);
+  const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showNotification = useCallback((message: string, type: 'error' | 'info' | 'success' = 'info') => {
+    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+    setNotification({ message, type });
+    notifTimerRef.current = setTimeout(() => setNotification(null), 3000);
+  }, []);
+
+  // Rename University modal state
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameUniversityInput, setRenameUniversityInput] = useState("");
+
   // Use the new Game Logic Hook
-  const { 
-      gameState, setGameState, gameSpeed, setGameSpeed, previousSpeed, setPreviousSpeed, handlers 
-  } = useGameLogic(setupData, currentSlot);
+  const {
+      gameState, setGameState, gameSpeed, setGameSpeed, previousSpeed, setPreviousSpeed, handlers
+  } = useGameLogic(setupData, currentSlot, showNotification);
 
   // UI State
   const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>(null);
@@ -146,6 +159,7 @@ export const CampusPlanner: React.FC = () => {
               socialRecognition: 0,
               ministryRecognition: 30,
               badges: [],
+              budgetConfirmed: false,
               publicity: { activeCampaigns: [], activeBuffs: [], ministryBonus: 30 },
               liaison: { missions: initialMissions, activeMissions: [], cooldowns: {}, grantDaysLeft: 0, grantDailyAmount: 0 }
           };
@@ -198,6 +212,15 @@ export const CampusPlanner: React.FC = () => {
       return () => cancelAnimationFrame(rafRef.current!);
   }, [appPhase, appSettings]);
 
+  // Autosave every 7 game days
+  useEffect(() => {
+      if (appPhase !== 'GAME' || !currentSlot || gameState.day <= 1) return;
+      if (gameState.day % 7 === 0) {
+          SaveManager.save(currentSlot, gameState, setupData);
+      }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.day]);
+
   // Event Triggers
   useEffect(() => {
       if (appPhase !== 'GAME') return;
@@ -210,7 +233,10 @@ export const CampusPlanner: React.FC = () => {
       if (gameDate.date === 1 && !gameState.budgetConfirmed && !showBudgetModal) {
           handlers.handleSpeedChange(0); setShowBudgetModal(true);
       }
-  }, [gameState.day, appPhase, gameState.budgetConfirmed, gameState.admissionsPhase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.day, appPhase, gameState.budgetConfirmed, gameState.admissionsPhase,
+      showOpeningCeremonyModal, showAdmissionsPrepModal, showBudgetModal,
+      gameState.incomingStudents.length]);
 
   // --- Map Interaction ---
   const handleContextMenu = useCallback((e: React.MouseEvent, x: number, y: number) => {
@@ -296,13 +322,14 @@ export const CampusPlanner: React.FC = () => {
       t.moved = false;
       t.isTouchPanning = false;
       // Long press for context menu (delete building)
+      // 在 timer 创建时捕获目标 buildingId，避免 600ms 后 hoveredCell 过期
+      const targetBuildingId = hoveredCell
+        ? gameState.grid[hoveredCell.y][hoveredCell.x]?.buildingId
+        : undefined;
       if (t.longPressTimer) clearTimeout(t.longPressTimer);
       t.longPressTimer = setTimeout(() => {
-        if (!t.moved && hoveredCell) {
-          const cell = gameState.grid[hoveredCell.y][hoveredCell.x];
-          if (cell.buildingId) {
-            handlers.removeBuilding(cell.buildingId);
-          }
+        if (!t.moved && targetBuildingId) {
+          handlers.removeBuilding(targetBuildingId);
         }
       }, 600);
     } else if (e.touches.length === 2) {
@@ -472,9 +499,9 @@ export const CampusPlanner: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden bg-orange-50" style={{ filter: `brightness(${appSettings.brightness})` }}>
-        <TopBar 
+        <TopBar
             gameState={gameState} currentStats={currentStats} gameDate={gameDate} gameSpeed={gameSpeed} appSettings={appSettings}
-            onRenameUniversity={() => { const n = prompt("新校名:", gameState.universityName); if(n) { if(gameState.money < 500000) { alert("资金不足（需要500K）"); return; } setGameState(p=>({...p, universityName:n, money:p.money-500000})); } }}
+            onRenameUniversity={() => { setRenameUniversityInput(gameState.universityName); setShowRenameModal(true); }}
             onSpeedChange={handlers.handleSpeedChange} onOpenSave={() => setShowSaveLoadModal(true)} onOpenSettings={() => setShowSettingsModal(true)}
         />
         
@@ -544,7 +571,7 @@ export const CampusPlanner: React.FC = () => {
                     {activeSidebarTab === 'HR' && <HRPanel gameState={gameState} onFire={(fid) => setGameState(p=>({...p, faculty: p.faculty.filter(f=>f.id!==fid)}))} onOpenRecruit={(m) => { setSelectedRecruitMethod(m); setRecruitmentConfigOpen(true); }} />}
                     {activeSidebarTab === 'ADMISSIONS' && <AdmissionsPanel gameState={gameState} setGameState={setGameState} onOpenPlanner={() => { setShowAdmissionPlannerModal(true); }} />}
                     {activeSidebarTab === 'OVERVIEW' && <OverviewPanel gameState={gameState} currentStats={currentStats} />}
-                    {activeSidebarTab === 'PUBLICITY' && <PublicityPanel gameState={gameState} onStartSocial={handlers.startSocialCampaign} onStartMinistry={handlers.startMinistryCampaign} />}
+                    {activeSidebarTab === 'PUBLICITY' && <PublicityPanel gameState={gameState} onStartSocial={handlers.startSocialCampaign} onStartMinistry={(type) => handlers.startMinistryCampaign(type, currentStats.facultySatisfaction)} />}
                     {activeSidebarTab === 'LIAISON' && <LiaisonPanel gameState={gameState} onAcceptMission={handlers.acceptMission} onClaimMission={handlers.claimMission} onCancelMission={handlers.cancelMission} />}
                 </div>
             </div>
@@ -628,7 +655,7 @@ export const CampusPlanner: React.FC = () => {
         
         <BudgetModal isOpen={showBudgetModal} onConfirm={() => { setShowBudgetModal(false); setActiveSidebarTab('FINANCE'); }} />
         <AdmissionsPrepModal isOpen={showAdmissionsPrepModal} onConfirm={() => { setShowAdmissionsPrepModal(false); setActiveSidebarTab('ADMISSIONS'); }} />
-        <OpeningCeremonyModal isOpen={showOpeningCeremonyModal} newStudents={gameState.studentList.length - gameState.students} tuition={0} onConfirm={() => { 
+        <OpeningCeremonyModal isOpen={showOpeningCeremonyModal} newStudents={gameState.incomingStudents.length} tuition={0} onConfirm={() => {
             const newStudents = [...gameState.incomingStudents];
             setGameState(p => ({...p, studentList: [...p.studentList, ...newStudents], students: p.students + newStudents.length, incomingStudents: []}));
             setShowOpeningCeremonyModal(false); handlers.handleSpeedChange(previousSpeed || 1); 
@@ -644,6 +671,48 @@ export const CampusPlanner: React.FC = () => {
             }
             setShowFacultySelectModal(false);
         }} onClose={() => setShowFacultySelectModal(false)} />
+
+        {/* 改名大学模态框 */}
+        {showRenameModal && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 animate-in fade-in zoom-in-95 duration-200">
+                    <h3 className="text-lg font-bold text-stone-800 mb-4">更改大学名称</h3>
+                    <p className="text-sm text-stone-500 mb-3">费用：500K￥</p>
+                    <input
+                        type="text"
+                        value={renameUniversityInput}
+                        onChange={e => setRenameUniversityInput(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-200 rounded-lg p-3 text-stone-800 focus:border-orange-500 outline-none mb-4"
+                        maxLength={20}
+                        autoFocus
+                    />
+                    <div className="flex gap-3">
+                        <button onClick={() => setShowRenameModal(false)} className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl font-bold text-sm">取消</button>
+                        <button onClick={() => {
+                            const newName = renameUniversityInput.trim();
+                            if (!newName) return;
+                            if (gameState.money < 500000) {
+                                showNotification("资金不足（需要 500K）", 'error');
+                                setShowRenameModal(false);
+                                return;
+                            }
+                            setGameState(p => ({ ...p, universityName: newName, money: p.money - 500000 }));
+                            setShowRenameModal(false);
+                        }} className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-400 text-white rounded-xl font-bold text-sm shadow">确认</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* 通知 Toast */}
+        {notification && (
+            <div className={`absolute top-20 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-xl shadow-lg text-white text-sm font-bold pointer-events-none animate-in fade-in slide-in-from-top-3 duration-200 whitespace-nowrap ${
+                notification.type === 'error' ? 'bg-red-500' :
+                notification.type === 'success' ? 'bg-emerald-500' : 'bg-stone-800'
+            }`}>
+                {notification.message}
+            </div>
+        )}
     </div>
   );
 };

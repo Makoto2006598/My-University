@@ -306,10 +306,23 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
 
     // Student Factors
     let sHapp = 50 + envHappiness + svcBonus;
-    if (fs.tuitionFeePerYear > 20) { const penalty = (fs.tuitionFeePerYear - 20) * 0.5; sHapp -= penalty; }
-    if (maintenanceRatio < 0.8) { sHapp -= 10; }
-    if (cafeteriaAllocated > currentStudents * 5) { sHapp += 5; }
-    if (studentAllocated > currentStudents * 2) { sHapp += 5; }
+    if (fs.tuitionFeePerYear > 20) {
+        const penalty = (fs.tuitionFeePerYear - 20) * 0.5;
+        sHapp -= penalty;
+        happinessFactors.push({ label: '学费偏高', value: -Math.round(penalty), type: 'negative' });
+    }
+    if (maintenanceRatio < 0.8) {
+        sHapp -= 10;
+        happinessFactors.push({ label: '维护不足', value: -10, type: 'negative' });
+    }
+    if (cafeteriaAllocated > currentStudents * 5) {
+        sHapp += 5;
+        happinessFactors.push({ label: '餐饮经费充足', value: 5, type: 'positive' });
+    }
+    if (studentAllocated > currentStudents * 2) {
+        sHapp += 5;
+        happinessFactors.push({ label: '学生补贴充足', value: 5, type: 'positive' });
+    }
     studentSatisfaction = Math.min(100, Math.max(0, sHapp));
 
     // Faculty Factors
@@ -318,7 +331,10 @@ export const calculateStats = (grid: CellData[][], currentStudents: number, curr
     // 教职工薪资预算是否充足
     if (salaryRequiredDaily > 0 && facultyAllocated < salaryRequiredDaily * 0.8) { fHapp -= 10; happinessFactors.push({ label: '薪资预算不足', value: -10, type: 'negative' }); }
     // 科研经费充足加成
-    if (researchAllocated > 5000) { fHapp += 3; }
+    if (researchAllocated > 5000) {
+        fHapp += 3;
+        happinessFactors.push({ label: '科研经费充足', value: 3, type: 'positive' });
+    }
     facultySatisfaction = Math.min(100, Math.max(0, fHapp));
 
     let avgHappiness = (studentSatisfaction * (currentStudents || 1) + facultySatisfaction * (gameState.faculty.length || 1)) / ((currentStudents || 1) + (gameState.faculty.length || 1));

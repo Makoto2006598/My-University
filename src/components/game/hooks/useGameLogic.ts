@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     GameState, UniType1, UniType2, UniversityScale, UniversityRank,
     AdmissionsPhase, FinanceHistoryPoint, ConstructionStatus,
@@ -21,7 +21,8 @@ import { BUILDINGS, VARIANTS, MISSIONS_DEF, COLLEGES_DEF } from '../../../data/g
 
 export const useGameLogic = (
     initialSetup: { name: string; type1: UniType1; type2: UniType2 },
-    currentSlot: number | null
+    currentSlot: number | null,
+    showNotification: (message: string, type?: 'error' | 'info' | 'success') => void
 ) => {
     // Initial Mission State
     const initialMissions: Record<string, MissionStatus> = {};
@@ -45,7 +46,6 @@ export const useGameLogic = (
 
     const [gameSpeed, setGameSpeed] = useState<number>(1);
     const [previousSpeed, setPreviousSpeed] = useState<number>(1);
-    const previousSpeedRef = useRef<number>(1);
 
     // --- GAME LOOP ---
     useEffect(() => {
@@ -261,7 +261,6 @@ export const useGameLogic = (
                 return;
             }
             setPreviousSpeed(speed);
-            previousSpeedRef.current = speed;
         }
         setGameSpeed(speed);
     }, [gameState.day, gameState.budgetConfirmed]);
@@ -287,7 +286,7 @@ export const useGameLogic = (
         if (needsRoad && tool !== BuildingType.SCHOOL_GATE) {
             const roadCheck = checkConnectedRoadAdjacency(gameState.grid, x, y, width, height);
             if (!roadCheck.valid) {
-                alert(roadCheck.reason || "建筑必须连接道路！"); return;
+                showNotification(roadCheck.reason || "建筑必须连接道路！", 'error'); return;
             }
         }
 
@@ -296,6 +295,11 @@ export const useGameLogic = (
         }
 
         setGameState(prev => {
+            // 在 setter 内再次验证余额，防止游戏计时器导致的竞态条件
+            if (prev.money < cost) {
+                showNotification("资金不足！", 'error');
+                return prev;
+            }
             const newGrid = prev.grid.map(row => row.map(c => ({...c})));
             const bid = generateId();
             const bDef = BUILDINGS[tool];
@@ -317,20 +321,22 @@ export const useGameLogic = (
             updateFullGrid(newGrid);
             return { ...prev, money: prev.money - cost, grid: newGrid };
         });
-    }, [gameState.money, gameState.grid]);
+    }, [gameState.money, gameState.grid, showNotification]);
 
     const commitRoad = useCallback((dragPath: {x:number, y:number}[], tool: BuildingType, variantIndex: number) => {
         if (dragPath.length === 0) return;
         const variants = VARIANTS[tool];
         const variant = variants ? variants[variantIndex] : undefined;
-        const cost = (variant?.cost || BUILDINGS[BuildingType.ROAD].cost) * dragPath.length;
-        if (gameState.money < cost) { alert("资金不足！"); return; }
+        const unitCost = variant?.cost || BUILDINGS[BuildingType.ROAD].cost;
 
         setGameState(prev => {
             const newGrid = prev.grid.map(row => row.map(c => ({...c})));
+            // 只统计实际可放路的格子，避免对已有道路重复收费
+            let actualCount = 0;
             dragPath.forEach(pos => {
                 const current = newGrid[pos.y][pos.x];
                 if (current.building === BuildingType.NONE || current.building === BuildingType.FENCE) {
+                    actualCount++;
                     newGrid[pos.y][pos.x] = {
                         x: pos.x, y: pos.y,
                         building: BuildingType.ROAD,
@@ -341,11 +347,18 @@ export const useGameLogic = (
                     };
                 }
             });
+            if (actualCount === 0) return prev;
+            const cost = unitCost * actualCount;
+            // 在 setter 内验证余额，防止竞态条件
+            if (prev.money < cost) {
+                showNotification("资金不足！", 'error');
+                return prev;
+            }
             // 新道路可能连通之前断开的路段，需要全局重算
             updateFullGrid(newGrid);
             return { ...prev, money: prev.money - cost, grid: newGrid };
         });
-    }, [gameState.money]);
+    }, [showNotification]);
 
     const removeBuilding = useCallback((buildingId: string) => {
         setGameState(prev => {
@@ -419,19 +432,22 @@ export const useGameLogic = (
         });
     }, []);
 
-    const startMinistryCampaign = useCallback((type: MinistryPublicityType) => {
-        if (type === MinistryPublicityType.CONNECTION) return; 
-        
-        setGameState(prev => {
-            const cost = 5000000;
-            if (prev.money < cost) { alert("资金不足 (需要 5M)"); return prev; }
-            
-            const hasOver = prev.publicity.activeBuffs.some(b => b.type === PublicityBuffType.OVER_PUBLICITY);
-            if (hasOver) { alert("处于过度宣传状态，无法公关。"); return prev; }
+    const startMinistryCampaign = useCallback((type: MinistryPublicityType, facSat: number = 50) => {
+        if (type === MinistryPublicityType.CONNECTION) return;
 
-            const stats = calculateStats(prev.grid, prev.students, prev.happiness, prev);
-            const facSat = stats.facultySatisfaction;
-            
+        const cost = 5000000;
+        setGameState(prev => {
+            if (prev.money < cost) {
+                showNotification("资金不足（需要 5M）", 'error');
+                return prev;
+            }
+
+            const hasOver = prev.publicity.activeBuffs.some(b => b.type === PublicityBuffType.OVER_PUBLICITY);
+            if (hasOver) {
+                showNotification("处于过度宣传状态，无法公关。", 'error');
+                return prev;
+            }
+
             const gainBase = 10 + Math.random() * 40;
             let gain = gainBase * (0.5 + 0.5 * (facSat / 100));
             
@@ -463,47 +479,43 @@ export const useGameLogic = (
                 }
             };
         });
-    }, []);
+    }, [showNotification]);
 
     // --- Liaison Handlers ---
     const acceptMission = useCallback((id: string) => {
-        setGameState(prev => {
-            // Check Capacity
-            if (prev.liaison.activeMissions.length >= 3) { alert("任务已满"); return prev; }
-            
-            // Check Exclusivity
-            const targetDef = MISSIONS_DEF[id];
-            
-            // 1. Check if ANY currently active mission is in the target's exclusiveWith list
-            const activeMissionIds = prev.liaison.activeMissions.map(m => m.id);
-            if (targetDef.exclusiveWith) {
-                const conflict = targetDef.exclusiveWith.find(exId => activeMissionIds.includes(exId));
-                if (conflict) {
-                    alert(`互斥任务冲突：无法同时进行此任务与【${MISSIONS_DEF[conflict].title}】。`);
-                    return prev;
-                }
-            }
+        // Check Capacity
+        if (gameState.liaison.activeMissions.length >= 3) {
+            showNotification("同时进行的任务已达上限（3个）", 'error');
+            return;
+        }
 
-            // 2. Check if the TARGET mission is in the exclusiveWith list of any currently active mission
-            // (Strictly speaking exclusiveWith should be symmetric, but safe to check)
-            for (const activeId of activeMissionIds) {
-                const activeDef = MISSIONS_DEF[activeId];
-                if (activeDef.exclusiveWith && activeDef.exclusiveWith.includes(id)) {
-                    alert(`互斥任务冲突：无法同时进行此任务与【${activeDef.title}】。`);
-                    return prev;
-                }
+        // Check Exclusivity before entering setter
+        const targetDef = MISSIONS_DEF[id];
+        const activeMissionIds = gameState.liaison.activeMissions.map(m => m.id);
+        if (targetDef.exclusiveWith) {
+            const conflict = targetDef.exclusiveWith.find(exId => activeMissionIds.includes(exId));
+            if (conflict) {
+                showNotification(`互斥任务冲突：无法与【${MISSIONS_DEF[conflict].title}】同时进行`, 'error');
+                return;
             }
+        }
+        for (const activeId of activeMissionIds) {
+            const activeDef = MISSIONS_DEF[activeId];
+            if (activeDef.exclusiveWith && activeDef.exclusiveWith.includes(id)) {
+                showNotification(`互斥任务冲突：无法与【${activeDef.title}】同时进行`, 'error');
+                return;
+            }
+        }
 
-            return {
-                ...prev,
-                liaison: {
-                    ...prev.liaison,
-                    missions: { ...prev.liaison.missions, [id]: MissionStatus.ACTIVE },
-                    activeMissions: [...prev.liaison.activeMissions, { id, acceptedDay: prev.day }]
-                }
-            };
-        });
-    }, []);
+        setGameState(prev => ({
+            ...prev,
+            liaison: {
+                ...prev.liaison,
+                missions: { ...prev.liaison.missions, [id]: MissionStatus.ACTIVE },
+                activeMissions: [...prev.liaison.activeMissions, { id, acceptedDay: prev.day }]
+            }
+        }));
+    }, [gameState.liaison, showNotification]);
 
     const cancelMission = useCallback((id: string) => {
         setGameState(prev => {
@@ -534,12 +546,20 @@ export const useGameLogic = (
             }
         }
 
-        // Check Categories
+        // Check Categories (must have ALL)
         if (req.categories) {
             for (const cat of req.categories) {
                 const found = state.colleges.find(c => COLLEGES_DEF[c.type].category === cat);
                 if (!found) return false;
             }
+        }
+
+        // Check Any One Category (must have AT LEAST ONE)
+        if (req.anyOneCategory) {
+            const found = req.anyOneCategory.some(cat =>
+                state.colleges.find(c => COLLEGES_DEF[c.type].category === cat)
+            );
+            if (!found) return false;
         }
 
         // Check Deans
@@ -551,7 +571,14 @@ export const useGameLogic = (
                     if (req.categories?.includes(COLLEGES_DEF[c.type].category)) requiredColleges.add(c.type);
                 });
             }
-            
+            if (req.anyOneCategory) {
+                // 有 anyOneCategory 时，找到满足条件的那个学院加入检查集合
+                for (const cat of req.anyOneCategory) {
+                    const col = state.colleges.find(c => COLLEGES_DEF[c.type].category === cat);
+                    if (col) { requiredColleges.add(col.type); break; }
+                }
+            }
+
             for (const cType of requiredColleges) {
                 const col = state.colleges.find(c => c.type === cType);
                 if (col && !col.deanId) return false;
@@ -562,7 +589,10 @@ export const useGameLogic = (
         if (req.minBuildingsPerCollege) {
             let requiredCollegeCount = (req.colleges?.length || 0);
             if (req.categories) {
-                 requiredCollegeCount += (req.categories.length);
+                requiredCollegeCount += req.categories.length;
+            }
+            if (req.anyOneCategory) {
+                requiredCollegeCount += 1; // 至少一个满足条件的学院
             }
 
             let buildingCount = 0;
@@ -579,11 +609,11 @@ export const useGameLogic = (
     };
 
     const claimMission = useCallback((id: string) => {
+        if (!checkRequirements(id, gameState)) {
+            showNotification("未满足任务完成条件！请检查学院、建筑或院长任命。", 'error');
+            return;
+        }
         setGameState(prev => {
-            if (!checkRequirements(id, prev)) {
-                alert("未满足任务完成条件！请检查学院、建筑或院长任命。");
-                return prev;
-            }
 
             const def = MISSIONS_DEF[id];
             const newMissions = { ...prev.liaison.missions, [id]: MissionStatus.COMPLETED };
@@ -627,7 +657,7 @@ export const useGameLogic = (
                 }
             };
         });
-    }, []);
+    }, [gameState, showNotification]);
 
     return {
         gameState,

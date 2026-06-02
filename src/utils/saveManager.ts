@@ -3,6 +3,12 @@ import { GameState } from '../types';
 
 const SAVE_KEY_PREFIX = 'uniCity_v3_slot_';
 
+interface SetupData {
+    name: string;
+    type1: string;
+    type2: string;
+}
+
 export interface SaveSlotInfo {
     slot: number;
     name: string;
@@ -13,7 +19,7 @@ export interface SaveSlotInfo {
 }
 
 export const SaveManager = {
-    save: (slot: number, gameState: GameState, setupData: any) => {
+    save: (slot: number, gameState: GameState, setupData: SetupData) => {
         try {
             const data = {
                 gameState,

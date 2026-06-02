@@ -321,8 +321,9 @@ export interface MissionDef {
   title: string;
   description: string;
   requirements: {
-    colleges?: CollegeType[]; // Must have these colleges
-    categories?: string[]; // Must have college of category (e.g. 'NEW_ENG')
+    colleges?: CollegeType[]; // Must have ALL of these colleges
+    categories?: string[]; // Must have a college of EVERY listed category
+    anyOneCategory?: string[]; // Must have a college of AT LEAST ONE listed category
     minBuildingsPerCollege?: { type: BuildingType; count: number };
     needDean?: boolean;
   };

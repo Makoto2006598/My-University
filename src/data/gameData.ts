@@ -109,7 +109,7 @@ export const MISSIONS_DEF: Record<string, MissionDef> = {
         description: '科技是第一生产力。向教育部申请确立学校发展方向为理工类大学，以理学为基础，工学为主干，致力于解决关键技术难题，推动工业进步。',
         requirements: {
             colleges: [CollegeType.SCIENCE],
-            categories: ['NEW_ENG', 'TRAD_ENG'], // Needs at least one from these
+            anyOneCategory: ['NEW_ENG', 'TRAD_ENG'], // At least one engineering college (new or traditional)
             minBuildingsPerCollege: { type: BuildingType.LECTURE_HALL, count: 1 },
             needDean: true
         },
