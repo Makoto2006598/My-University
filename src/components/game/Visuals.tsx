@@ -123,11 +123,11 @@ export const Cube3D: React.FC<{
             pointerEvents: 'none',
             opacity
         }}>
-            <div className={`absolute ${colorClass} origin-bottom`} style={{ width: `${width}px`, height: `${height}px`, bottom: 0, left: 0, transform: `rotateX(-90deg)`, filter: 'brightness(0.8)', ...textureStyle, backfaceVisibility: 'hidden' }} />
-            <div className={`absolute ${colorClass} origin-right`} style={{ width: `${depth}px`, height: `${height}px`, top: 0, right: 0, transform: `rotateY(-90deg) rotateZ(90deg)`, transformOrigin: 'right bottom', filter: 'brightness(0.6)', ...textureStyle, backfaceVisibility: 'hidden' }} />
-            <div className={`absolute ${colorClass} origin-top`} style={{ width: `${width}px`, height: `${height}px`, top: 0, left: 0, transform: `rotateX(90deg)`, filter: 'brightness(0.7)', ...textureStyle, backfaceVisibility: 'hidden' }} />
-            <div className={`absolute ${colorClass} origin-left`} style={{ width: `${depth}px`, height: `${height}px`, top: 0, left: 0, transform: `rotateY(90deg) rotateZ(-90deg)`, transformOrigin: 'left bottom', filter: 'brightness(0.9)', ...textureStyle, backfaceVisibility: 'hidden' }} />
-            <div className={`absolute ${colorClass}`} style={{ width: `${width}px`, height: `${depth}px`, top: 0, left: 0, transform: `translateZ(${height}px)`, filter: 'brightness(1.1)', ...textureStyle, backfaceVisibility: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.15)' }}>
+            <div className={`absolute ${colorClass} origin-bottom`} style={{ ...textureStyle, width: `${width}px`, height: `${height}px`, bottom: 0, left: 0, transform: `rotateX(-90deg)`, filter: 'brightness(0.8)', backfaceVisibility: 'hidden' }} />
+            <div className={`absolute ${colorClass} origin-right`} style={{ ...textureStyle, width: `${depth}px`, height: `${height}px`, top: 0, right: 0, transform: `rotateY(-90deg) rotateZ(90deg)`, transformOrigin: 'right bottom', filter: 'brightness(0.6)', backfaceVisibility: 'hidden' }} />
+            <div className={`absolute ${colorClass} origin-top`} style={{ ...textureStyle, width: `${width}px`, height: `${height}px`, top: 0, left: 0, transform: `rotateX(90deg)`, filter: 'brightness(0.7)', backfaceVisibility: 'hidden' }} />
+            <div className={`absolute ${colorClass} origin-left`} style={{ ...textureStyle, width: `${depth}px`, height: `${height}px`, top: 0, left: 0, transform: `rotateY(90deg) rotateZ(-90deg)`, transformOrigin: 'left bottom', filter: 'brightness(0.9)', backfaceVisibility: 'hidden' }} />
+            <div className={`absolute ${colorClass}`} style={{ ...textureStyle, width: `${width}px`, height: `${depth}px`, top: 0, left: 0, transform: `translateZ(${height}px)`, filter: 'brightness(1.1)', backfaceVisibility: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.15)' }}>
                 {label}
             </div>
         </div>
@@ -137,7 +137,6 @@ export const Cube3D: React.FC<{
 export const Building3DBox: React.FC<{
     width: number;
     depth: number;
-    height: number;
     colorClass: string;
     textureStyle: React.CSSProperties;
     cell: CellData;

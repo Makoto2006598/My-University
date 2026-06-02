@@ -53,7 +53,7 @@ const GridCell = React.memo<{
             }}
             onContextMenu={onCtx}
         >
-            {cell.constructionStatus === ConstructionStatus.CONSTRUCTING && (
+            {cell.constructionStatus === ConstructionStatus.CONSTRUCTING && cell.isOrigin && (
                 <div className="absolute inset-0 z-10 bg-orange-100/80 border border-yellow-500/50 overflow-hidden" style={{transform: 'translateZ(1px)'}}>
                     <div className="absolute inset-0 opacity-20" style={{backgroundImage: 'repeating-linear-gradient(45deg, #fbbf24 0, #fbbf24 5px, transparent 5px, transparent 10px)'}}></div>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-800 text-[10px] font-bold">
@@ -67,7 +67,6 @@ const GridCell = React.memo<{
                 <Building3DBox
                     width={dims.w}
                     depth={dims.h}
-                    height={cell.constructionStatus === ConstructionStatus.CONSTRUCTING ? 10 : 40}
                     colorClass={cell.constructionStatus === ConstructionStatus.CONSTRUCTING ? 'bg-yellow-500/50' : BUILDINGS[cell.building].color}
                     textureStyle={textureStyle}
                     cell={cell}
@@ -92,9 +91,9 @@ const GridCell = React.memo<{
 
             {cell.serviceCoverage && cell.building === BuildingType.NONE && (
                 <div className={`absolute inset-0 pointer-events-none ${
-                    cell.serviceCoverage.food ? 'bg-orange-400/8' :
-                    cell.serviceCoverage.study ? 'bg-blue-400/8' :
-                    cell.serviceCoverage.recreation ? 'bg-green-400/8' : ''
+                    cell.serviceCoverage.food ? 'bg-orange-400/15' :
+                    cell.serviceCoverage.study ? 'bg-blue-400/15' :
+                    cell.serviceCoverage.recreation ? 'bg-green-400/15' : ''
                 }`} />
             )}
 
